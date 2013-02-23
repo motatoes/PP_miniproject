@@ -122,6 +122,8 @@ int main()
         float sum = sum_prob(G,T,n);
         update_prob(G,T,P,n,sum);
 
+        //increment iters
+        iters += 1;
     }
 
     //Free the memory
