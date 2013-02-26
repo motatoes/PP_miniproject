@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-
+//
 #define ITER_MAX 50
 //evaporation rate
 #define p  0.5
