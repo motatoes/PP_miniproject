@@ -169,10 +169,10 @@ void init_twist_table() {
 
 
 // 1- "
-//Edge permutation. We need to now ll in the edge trans and corner trans arrays. Based on our cubie
+//Edge permutation. We need to now fill in the edge trans and corner trans arrays. Based on our cubie
 //numbering, we can build an array listing the slots that are acted by a clockwise twist of each face, in the
 //order of the moves, based on our slot numbering convention and move numbering convention. A clockwise
-//twist of the rst face (U) moves the cubie from slot 0 into slot 2, from slot 2 into slot 3, from slot 3 into
+//twist of the first face (U) moves the cubie from slot 0 into slot 2, from slot 2 into slot 3, from slot 3 into
 //slot 1, and from slot 1 into slot 0. This is represented by the permutation written as (0,2,3,1) and this comprises
 //the first element of the following array. The rest are filled in similarly"
 //
@@ -191,7 +191,7 @@ static const unsigned char edge_twist_perm[FACES * 4] = {
 //This permutation is (0; 1; 3; 2), and it's the first entry in the array below. This array is carefully constructed
 //so the first two slots are always from the U face (assuming any slots are), which simplfies some later code."
 //
-//however, we decide to serialize the array because it makes it clear which locations are contigous,we do this row by row:
+//however, we decide to serialize the array because it makes it clear which locations are //contigous,we do this row by row:
 
 
 static const unsigned char corner_twist_perm[FACES * 4] = {
@@ -290,14 +290,14 @@ void permute_twist_table() {
 			}
 		}
 }
-//we can now (finally) introduce our move function that performs a move operation. 
+//we can now (finally) introduce our move function that performs a twist operation. 
 //The function takes an integer that represents the index of the move (similar to the order described above)  
 //and the cube to manipulate, and manipulates it
 
 
 
 void move(CubePos *C, int mov) {
-	const unsigned char *p = corner_trans[mov * CUBIES];
+	const unsigned char *p = &corner_trans[mov * CUBIES];
 	(*C).c[0] = p[(*C).c[0]];
 	(*C).c[1] = p[(*C).c[1]];
 	(*C).c[2] = p[(*C).c[2]];
@@ -306,7 +306,7 @@ void move(CubePos *C, int mov) {
 	(*C).c[5] = p[(*C).c[5]];
 	(*C).c[6] = p[(*C).c[6]];
 	(*C).c[7] = p[(*C).c[7]];
-	 p = edge_trans[mov * CUBIES];
+	 p = &edge_trans[mov * CUBIES];
 	(*C).e[0] = p[ (*C).e[0]];
 	(*C).e[1] = p[ (*C).e[1]];
 	(*C).e[2] = p[ (*C).e[2]];
@@ -341,7 +341,8 @@ int main() {
 	cube_init(&base);
 	printTable(&base);
 
-    //move(&base, 0);
-	//printTable(&base);
+	printf("\n\n\n");
+    move(&base, 0);
+	printTable(&base);
 
 }
