@@ -2,8 +2,10 @@
 #include <stdlib.h>
 #include <math.h>
 #include <time.h>
+#include <string.h>
 
-#define ITER_MAX 1
+
+#define ITER_MAX 5
 //evaporation rate
 #define p  0.5
 //influence rate of the pheroneme
@@ -87,7 +89,7 @@ void update_prob(int * G, float * T, float * P, int size, float * sum)
         {
             index = size*i + j;
             if(i==j) P[index]=0;
-            else{
+            else if(i < j){
                 P[index] = pow(T[index],alpha) * pow(1/G[index],beta)/sum[i];
             }
         }
@@ -104,7 +106,7 @@ float * sum_prob(int * G, float * T, int size)
         for(j=0 ; j<size ; j++)
         {
             index = size*i + j;
-            if(i != j){
+            if(i < j){
                 sum[i] += pow(T[index],alpha) * pow(1/G[index],beta);
             }
         }
@@ -148,7 +150,7 @@ int main()
     int N = n*n;
     //We define the graph using a matrix of size N
     //This matrix contain the distance between each node
-    //if two nodes are not connected then the value is -1
+    //if two nodes are not connected then the value is 0
     int * G = malloc(sizeof(int)*N);
 
     //We define the level of pheroneme for each edge in a matrix
@@ -185,7 +187,7 @@ int main()
     int Lmin;
 
     //Shortest path
-    int * best_path;
+    int * best_path = malloc(sizeof(int)*n);
 
     while(iter<ITER_MAX)
     {
@@ -193,6 +195,8 @@ int main()
         int k;
         for(k=0 ; k<nb_ants ; k++)
         {
+
+	    printf("\nThe %dth ant : \n",k+1);
             int i;
             //initialize the array that contain the solution
             int * kth_solution = malloc(sizeof(int)*n);
@@ -207,48 +211,58 @@ int main()
             float rdm;
             int j;
             srand(time(NULL));
-            while(kth_solution[i] != n-1)
+            while(kth_solution[i-1] != n-1)
             {
                 printf("kth_sol[i-1]: %d \n",kth_solution[i-1]);
                 //select the next node based on the probability
                 //generate a random number between 0 and 1
                 rdm = rand()%10/(float)10;
                 printf("random number : %f \n",rdm);
-                for(j=0; j<n; j++)
+
+		//Probability to select the next node
+		float Pnext = 0;
+
+                for(j=kth_solution[i]; j<n; j++)
                 {
+		    Pnext += P[n*kth_solution[i-1] + j];
+
                     //if the random number is less or equal to
-                    //the probability to choose j as the next node we select it
-                    printf("probability to move from %d to %d: %f \n",kth_solution[i-1],j,P[n*kth_solution[i-1] + j]);
-                    if( rdm <= P[n*kth_solution[i-1] + j])
+                    //the probability to select the next node we select it
+                    printf("probability to move from %d to %d: %f \n",kth_solution[i-1],j,Pnext);
+                    if( rdm <= Pnext && rdm > 0 ) 
                     {
                         kth_solution[i]=j;
+			break;
                     }
                 }
                 printf("kth_sol[i]: %d \n",kth_solution[i]);
                 i++;
+
             }
-            printf("test");
-//            //Calculate the length of the path
-//            L[k]=0;
-//            i=0;
-//            while(kth_solution[i] != n-1)
-//            {
-//                L[k] += G[kth_solution[i]*n + kth_solution[i+1]];
-//                i++;
-//            }
-//
-//            //find the shortest length and path
-//            Lmin=L[0];
-//            if(L[k]<=Lmin)
-//            {
-//                Lmin = L[k];
-//                best_path = kth_solution;
-//            }
-//
-//            //update pheroneme values
-//            update_pheroneme(T,n,kth_solution,L[k]);
-//
-//            free(kth_solution);
+
+            //printf("test \n");
+
+            //Calculate the length of the path
+            L[k]=0;
+            i=0;
+            while(kth_solution[i] != n-1)
+            {
+                L[k] += G[kth_solution[i]*n + kth_solution[i+1]];
+                i++;
+            }
+
+            //find the shortest length and path
+            Lmin=L[0];
+            if(L[k]<=Lmin)
+            {
+                Lmin = L[k];
+                memcpy(best_path, kth_solution, sizeof(int)*n );
+            }
+
+            //update pheroneme values            
+            update_pheroneme(T,n,kth_solution,L[k]);
+
+            free(kth_solution);
 
         }
 
@@ -260,15 +274,17 @@ int main()
         iter++;
     }
 
-//    //Best path
-//    printf("the best path: \n");
-//    int i=0;
-//    while(best_path[i] != n-1)
-//    {
-//        printf("%d ",best_path[i]);
-//    }
-//    printf("\n");
-//    printf("length of the best path: %d \n",Lmin);
+    //Best path
+    printf("the best path: \n");
+    int i=1;
+    printf("%d ",best_path[0]);
+    while(best_path[i-1] !=  n-1)
+    {
+        printf("%d ",best_path[i]);
+	i++;
+    }
+    printf("\n");
+    printf("length of the best path: %d \n",Lmin);
 
 
     //Free the memory
