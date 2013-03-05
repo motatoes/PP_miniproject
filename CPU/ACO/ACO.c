@@ -1,84 +1,143 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <time.h>
 
-#define ITER_MAX 50
+#define ITER_MAX 1
 //evaporation rate
 #define p  0.5
 //influence rate of the pheroneme
 #define alpha 0.6
-//influence rate of the distance
+//influence rate of the heuristic (distance)
 #define beta 0.4
+//Initial level of pheroneme
+#define C 5
+//Pheroneme constant
+#define Q 5
 
 void init_graph(int * G, int size)
 {
-    int i,j;
-    for(j=0 ; j<size ; j++)
+    int i,j,index;
+    for(i=0 ; i<size ; i++)
     {
-        for(i=0 ; i<size ; i++)
+        for(j=0 ; j<size ; j++)
         {
+            index = size*i + j;
             if(i==j)
-                G[i+size*j] = 0;
+                G[index] = 0;
             else{
-            G[i+size*j] = 1;}
+            G[index] = 1;}
         }
     }
 }
 
-void init(float * data, int size)
+//function that initialize the pheroneme to a constant value
+void init_pheroneme(float * T, int size)
 {
-    int i,j;
-    for(j=0 ; j<size ; j++)
+    int i,j,index;
+    for(i=0 ; i<size ; i++)
     {
-        for(i=0 ; i<size ; i++)
+        for(j=0 ; j<size ; j++)
         {
-            data[i+size*j] = 0;
+            index = size*i + j;
+            if(i==j)
+            {
+               T[index] = 0;
+            }
+            else{
+            T[index] = C;
+            }
         }
     }
 }
 
-void update_pheroneme(float * T, int size)
+void update_pheroneme(float * T, int size, int * sol, int length_sol)
 {
+    int i,j,index;
+
     //evaporation
-    int i,j;
-    for(j=0 ; j<size ; j++)
+    for(i=0 ; i<size ; i++)
     {
-        for(i=0 ; i<size ; i++)
+        for(j=0 ; j<size ; j++)
         {
-            T[i+size*j] = (1-p) * T[i+size*j];
+            index = size*i + j;
+            if(i != j)
+            {
+                T[index] = (1-p) * T[index];
+            }
         }
     }
 
-    //update based on constructed solutions
+    //update based on constructed solution
+    i=0;
+    while(sol[i] != size-1)
+    {
+        T[size*sol[i] + sol[i+1]] += Q/length_sol;
+        i++;
+    }
 
 }
 
-void update_prob(int * G, float * T, float * P, int size, float sum)
+void update_prob(int * G, float * T, float * P, int size, float * sum)
 {
-    int i,j;
-    for(j=0 ; j<size ; j++)
+    int i,j,index;
+    for(i=0 ; i<size ; i++)
     {
-        for(i=0 ; i<size ; i++)
+        for(j=0 ; j<size ; j++)
         {
-            int index = i+size*j;
-            P[index] = pow(T[index],alpha) * pow(G[index],beta)/sum;
+            index = size*i + j;
+            if(i==j) P[index]=0;
+            else{
+                P[index] = pow(T[index],alpha) * pow(1/G[index],beta)/sum[i];
+            }
         }
     }
 }
 
-float sum_prob(int * G, float * T, int size)
+float * sum_prob(int * G, float * T, int size)
 {
-    int i,j;
-    float sum = 0;
-    for(j=0 ; j<size ; j++)
+    int i,j,index;
+    float * sum = malloc(sizeof(float)*size);
+    for(i=0 ; i<size ; i++)
     {
-        for(i=0 ; i<size ; i++)
+        sum[i]=0;
+        for(j=0 ; j<size ; j++)
         {
-            int index = i+size*j;
-            sum += pow(T[index],alpha) * pow(G[index],beta);
+            index = size*i + j;
+            if(i != j){
+                sum[i] += pow(T[index],alpha) * pow(1/G[index],beta);
+            }
         }
     }
     return sum;
+}
+
+void print_int(int * data, int size)
+{
+    int i,j,index;
+    for(i=0 ; i<size ; i++)
+    {
+        for(j=0 ; j<size ; j++)
+        {
+            index = size*i + j;
+            printf("%d ",data[index]);
+        }
+        printf("\n");
+    }
+}
+
+void print_float(float * data, int size)
+{
+    int i,j,index;
+    for(i=0 ; i<size ; i++)
+    {
+        for(j=0 ; j<size ; j++)
+        {
+            index = size*i + j;
+            printf("%f ",data[index]);
+        }
+        printf("\n");
+    }
 }
 
 int main()
@@ -88,6 +147,8 @@ int main()
     int n = 5;
     int N = n*n;
     //We define the graph using a matrix of size N
+    //This matrix contain the distance between each node
+    //if two nodes are not connected then the value is -1
     int * G = malloc(sizeof(int)*N);
 
     //We define the level of pheroneme for each edge in a matrix
@@ -96,40 +157,126 @@ int main()
     //We define the matrice of the probabilities
     float * P = malloc(sizeof(float)*N);
 
-    //initialize the three matrices
+    //Initialize the graph and the level of pheroneme
     init_graph(G,n);
-    init(T,n);
-    init(P,n);
+    init_pheroneme(T,n);
+
+    //Initialize the probabilities
+    float * sum = sum_prob(G,T,n);
+    update_prob(G,T,P,n,sum);
+
+    printf("graph: \n");
+    print_int(G,n);
+    printf("pheroneme: \n");
+    print_float(T,n);
+    printf("probabilities: \n");
+    print_float(P,n);
 
     //Let's define the number of ants that are going to go through the graph
-    int nb_ants = 10;
+    int nb_ants = 2;
+
+    //Array that contain the length of the path generated by each ant
+    int * L = malloc(sizeof(int)*nb_ants);
 
     //number of iteration
     int iter = 0;
+
+    //Minimum length
+    int Lmin;
+
+    //Shortest path
+    int * best_path;
+
     while(iter<ITER_MAX)
     {
         //for each ant construct a path from the starting point to the final point
         int k;
         for(k=0 ; k<nb_ants ; k++)
         {
+            int i;
+            //initialize the array that contain the solution
+            int * kth_solution = malloc(sizeof(int)*n);
+            for(i=0; i<n ; i++)
+            {
+                kth_solution[i]=0;
+
+            }
+
+            //Generate the solution
+            i=1;
+            float rdm;
+            int j;
+            srand(time(NULL));
+            while(kth_solution[i] != n-1)
+            {
+                printf("kth_sol[i-1]: %d \n",kth_solution[i-1]);
+                //select the next node based on the probability
+                //generate a random number between 0 and 1
+                rdm = rand()%10/(float)10;
+                printf("random number : %f \n",rdm);
+                for(j=0; j<n; j++)
+                {
+                    //if the random number is less or equal to
+                    //the probability to choose j as the next node we select it
+                    printf("probability to move from %d to %d: %f \n",kth_solution[i-1],j,P[n*kth_solution[i-1] + j]);
+                    if( rdm <= P[n*kth_solution[i-1] + j])
+                    {
+                        kth_solution[i]=j;
+                    }
+                }
+                printf("kth_sol[i]: %d \n",kth_solution[i]);
+                i++;
+            }
+            printf("test");
+//            //Calculate the length of the path
+//            L[k]=0;
+//            i=0;
+//            while(kth_solution[i] != n-1)
+//            {
+//                L[k] += G[kth_solution[i]*n + kth_solution[i+1]];
+//                i++;
+//            }
+//
+//            //find the shortest length and path
+//            Lmin=L[0];
+//            if(L[k]<=Lmin)
+//            {
+//                Lmin = L[k];
+//                best_path = kth_solution;
+//            }
+//
+//            //update pheroneme values
+//            update_pheroneme(T,n,kth_solution,L[k]);
+//
+//            free(kth_solution);
 
         }
 
-        //update pheroneme values
-        update_pheroneme(T,n);
-
         //update probabilities
-        float sum = sum_prob(G,T,n);
+        sum = sum_prob(G,T,n);
         update_prob(G,T,P,n,sum);
 
-        //increment iters
-        iters += 1;
+        //increment iter
+        iter++;
     }
+
+//    //Best path
+//    printf("the best path: \n");
+//    int i=0;
+//    while(best_path[i] != n-1)
+//    {
+//        printf("%d ",best_path[i]);
+//    }
+//    printf("\n");
+//    printf("length of the best path: %d \n",Lmin);
+
 
     //Free the memory
     free(G);
     free(T);
     free(P);
+    free(L);
+    free(best_path);
 
     return 0;
 }
