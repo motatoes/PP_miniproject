@@ -1,3 +1,16 @@
+
+#include "stdio.h"
+#include "stdlib.h"
+#include "math.h"
+#include "string.h" /* memset */
+
+
+
+
+#include "core.c"
+
+
+
 //this file is about parsing a string in singmaster's notation and ouptutting a 
 //string that's reformatted to the internal representation of the cube
 
@@ -26,20 +39,38 @@
 //corners are represented using the three faces that they meet in a solved cube
 //  edges are represented using the two   faces that they meet in a solved cube
 //
+
+
+
 static char static_buf[200] ;
 
-//inverting a corner and edge sequence
-void invert_into(cubepos &old, cubepos &dst) const {
-   for (int i=0; i<8; i++) {
-      int cval = old.c[i] ;
-      dst.c[corner_perm(cval)] = corner_ori_sub(i, cval) ;
-   }
-   for (int i=0; i<12; i++) {
-      int cval = old.e[i] ;
-      dst.e[edge_perm(cval)] = edge_val(i, edge_ori(cval)) ;
-   }
-}
 
+static const char *sing_solved =
+"UF UR UB UL DF DR DB DL FR FL BR BL UFR URB UBL ULF DRF DFL DLB DBR" ;
+
+static const char *const smedges[] = {
+   "UB", "BU", "UL", "LU", "UR", "RU", "UF", "FU",
+   "LB", "BL", "RB", "BR", "LF", "FL", "RF", "FR",
+   "DB", "BD", "DL", "LD", "DR", "RD", "DF", "FD",
+} ;
+static const char *const smcorners[] = {
+   "UBL", "URB", "ULF", "UFR", "DLB", "DBR", "DFL", "DRF",
+   "LUB", "BUR", "FUL", "RUF", "BDL", "RDB", "LDF", "FDR",
+   "BLU", "RBU", "LFU", "FRU", "LBD", "BRD", "FLD", "RFD",
+   "ULB", "UBR", "UFL", "URF", "DBL", "DRB", "DLF", "DFR",
+   "LBU", "BRU", "FLU", "RFU", "BLD", "RBD", "LFD", "FRD",
+   "BUL", "RUB", "LUF", "FUR", "LDB", "BDR", "FDL", "RDF",
+} ;
+
+
+const int INVALID = 99 ;
+static unsigned char lookup_edge_cubie[FACES*FACES] ;
+static unsigned char lookup_corner_cubie[FACES*FACES*FACES] ;
+static unsigned char sm_corner_order[8] ;
+static unsigned char sm_edge_order[12] ;
+static unsigned char sm_edge_flipped[12] ;
+
+///////////////
 
 void skip_whitespace(const char *p)   {
    while (*p && *p <= ' ')
@@ -52,6 +83,7 @@ int parse_face(const char *p) {
    return f ; 
 }
 int parse_face_from_char( char *f) {
+   printf("asdfsaf%s\n\n",*f);
    switch (*f) {
 case 'u': case 'U': return 0 ;
 case 'f': case 'F': return 1 ;
@@ -80,34 +112,119 @@ default:
    p = q + 1 ;
    return f * TWISTS + t ;
 }
-void append_move(char **p, int mv) {
-   append_face(p, mv/TWISTS) ;
-   *p++ = "123"[mv % TWISTS] ;
-   *p = 0 ;
+/////////////////
+static int parse_cubie(const char **p) {
+   skip_whitespace(*p) ;
+   int v = 1 ;
+   int f = 0 ;
+   while ((f=parse_face(*p)) >= 0) {
+      v = v * 6 + f ;
+      if (v >= 2 * 6 * 6 * 6)
+         return -1 ;
+   }
+   return v ;
 }
-moveseq parse_moveseq(const char **p) {
-   moveseq r ;
-   int mv ;
-   while ((mv=parse_move(p)) >= 0)
-      r.push_back(mv) ;
-   return r ;
+static int parse_edge(const char *p) {
+   int c = parse_cubie(&p) ;
+   if (c < 6 * 6 || c >= 2 * 6 * 6)
+      return -1 ;
+   c = lookup_edge_cubie[c-6*6] ;
+   if (c == INVALID)
+      return -1 ;
+   return c ;
 }
-void append_moveseq(char **p, const moveseq *seq) {
-   *p = 0 ;
-   for (unsigned int i=0; i<seq.size(); i++)
-      append_move(p, seq[i]) ;
+static int parse_corner(const char *p) {
+   int c = parse_cubie(&p) ;
+   if (c < 6 * 6 * 6 || c >= 2 * 6 * 6 * 6)
+      return -1 ;
+   c = lookup_corner_cubie[c-6*6*6] ;
+   if (c == INVALID || c >= CUBIES)
+      return -1 ;
+   return c ;
 }
-char *moveseq_string(const moveseq *seq) {
-   if (*seq.size() > 65)
-      error("! can't print a move sequence that long") ;
+
+
+
+//We need to initialize all of those arrays.
+
+void sm_init() {
+
+   int i;
+   memset(lookup_edge_cubie, INVALID, sizeof(lookup_edge_cubie)) ;
+   memset(lookup_corner_cubie, INVALID, sizeof(lookup_corner_cubie)) ;
+   for (i=0; i<CUBIES; i++) {
+      const char *tmp = 0 ;
+      tmp=smcorners[i];
+      tmp=smcorners[CUBIES+i];
+      tmp=smedges[i];
+      lookup_corner_cubie[parse_cubie(&tmp)-6*6*6] = i ;
+      lookup_corner_cubie[parse_cubie(&tmp)-6*6*6] = CUBIES+i ;
+      lookup_edge_cubie[parse_cubie(&tmp)-6*6] = i ;
+   }
+   const char *p = sing_solved ;
+   for (i=0; i<12; i++) {
+      int cv = parse_edge(p) ;
+      sm_edge_order[i] = edge_perm(cv) ;
+      sm_edge_flipped[i] = edge_ori(cv) ;
+   }
+   for (i=0; i<8; i++)
+      sm_corner_order[i] = corner_perm(parse_corner(p)) ;
+}
+
+//inverting a corner and edge sequence
+void invert_into(CubePos *old, CubePos *dst)  {
+   int i;
+   for (i=0; i<8; i++) {
+      int cval = (*old).c[i] ;
+      (*dst).c[corner_perm(cval)] = corner_ori_sub(i, cval) ;
+   }
+   for ( i=0; i<12; i++) {
+      int cval = (*old).e[i] ;
+      (*dst).e[edge_perm(cval)] = edge_val(i, edge_ori(cval)) ;
+   }
+}
+
+char *Singmaster_string(CubePos *toinvert)  {
+   CubePos cp ;
+   int i;
+   invert_into(toinvert, &cp) ;
    char *p = static_buf ;
-   append_moveseq(&p, seq) ;
+   for (i=0; i<12; i++) {
+      if (i != 0)
+         *p++ = ' ' ;
+      int j = sm_edge_order[i] ;
+      const char *q = smedges[cp.e[j] ^ sm_edge_flipped[i]] ;
+      *p++ = *q++ ;
+      *p++ = *q++ ;
+   }
+   for (i=0; i<8; i++) {
+      *p++ = ' ' ;
+      int j = sm_corner_order[i] ;
+      const char *q = smcorners[cp.c[j]] ;
+      *p++ = *q++ ;
+      *p++ = *q++ ;
+      *p++ = *q++ ;
+   }
+   *p = 0 ;
    return static_buf ;
 }
 
 
 
-char** parseCube(char* p) {
+
+
+int main() {
+
+
+   sm_init();
+
+   //CubePos base;
+   //cube_init(&base);
+   //print_corners_and_edges(&base);
+
+   //char *a = Singmaster_string(&base);
+
+   //printf("%s", a);
+
 
 }
-
