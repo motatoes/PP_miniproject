@@ -2,7 +2,14 @@
 #include "stdlib.h"
 #include "math.h"
 
+//prevent duplication when adding 'core.c'
+#ifndef CORE_C
+#define CORE_C
 #include "core.c"
+#endif
+
+
+#include "parse.c"
 
 /************************************************************************************************************
 *																											*
@@ -204,14 +211,27 @@ void move(CubePos *C, int mov) {
 
 
 int main() {
+sm_init();
 	init_twist_table();
 	permute_twist_table();
 	CubePos base;
 	cube_init(&base);
-	print_corners_and_edges(&base);
 
 	printf("\n\n\n");
     move(&base, 0);
-	printTable(&base);
+
+
+	print_corners_and_edges(&base);
+
+   char *sm = "UF UR UB UL DF DR DB DL FR FL BR BL UFR URB UBL ULF DRF DFL DLB DBR ";
+   const char *r;
+   r = "asdas";
+   //r = parse_Singmaster(&base, sm);
+
+   print_corners_and_edges(&base);
+
+   char *a = Singmaster_string(&base);
+
+   printf("%s", a);
 
 }

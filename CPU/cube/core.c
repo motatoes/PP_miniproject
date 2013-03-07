@@ -91,8 +91,8 @@ static int edge_flip(int cubieval) 	     { return cubieval ^ 1 ; }
 static int edge_val(int perm, int ori) 	     { return perm * 2 + ori ; }
 static int corner_val(int perm, int ori)     { return ori * 8 + perm ; }
 static int edge_ori_add(int cv1, int cv2)    { return cv1 ^ edge_ori(cv2) ; }
-static int corner_ori_add(int cv1, int cv2)  { return cv1 + cv2 % 3 ; }
-static int corner_ori_sub(int cv1, int cv2)  { return cv1 - cv2 % 3 ;}
+static int corner_ori_add(int cv1, int cv2)  { return (cv1 + cv2 & 0x18) % 24 ; }
+static int corner_ori_sub(int cv1, int cv2)  { return cv1 + corner_val(0, (3 - corner_ori(cv2) ) % 3) ;}
 
 //we initialize the corners and edges with zero orientation, which is true for a 
 //soved cube
@@ -108,7 +108,7 @@ void cube_init(CubePos* b) {
 
 void print_corners_and_edges(CubePos *c) {
 	int i;
-	printf("Cubes --\n");
+	printf("Corners --\n");
 	for (i=0;i<8;i++)
 		printf("%d ", (*c).c[i]);
 
@@ -116,4 +116,8 @@ void print_corners_and_edges(CubePos *c) {
 
 	for (i=0;i<12;i++)
 		printf(" %d ", (*c).e[i]);
+
+	printf("\n\n ");
+
 }
+

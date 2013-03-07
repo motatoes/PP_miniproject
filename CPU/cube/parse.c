@@ -4,12 +4,11 @@
 #include "math.h"
 #include "string.h" /* memset */
 
-
-
-
+//prevent duplication when adding 'core.c'
+#ifndef CORE_C
+#define CORE_C
 #include "core.c"
-
-
+#endif
 
 //this file is about parsing a string in singmaster's notation and ouptutting a 
 //string that's reformatted to the internal representation of the cube
@@ -72,18 +71,22 @@ static unsigned char sm_edge_flipped[12] ;
 
 ///////////////
 
-void skip_whitespace(const char *p)   {
-   while (*p && *p <= ' ')
-      p++ ;
+void skip_whitespace(const char **p)   {
+   while (**p && **p <= ' ')
+   {
+      (*p)++ ;
+    }
 }
-int parse_face(const char *p) {
-   int f = parse_face_from_char( *p) ;
+
+int parse_face(const char **p) {
+   int f = parse_face_from_char(*p) ;
    if (f >= 0)
-      p++ ;
+      (*p)++ ;
    return f ; 
 }
-int parse_face_from_char( char *f) {
-   printf("asdfsaf%s\n\n",*f);
+int parse_face_from_char(const char *f) {
+
+
    switch (*f) {
 case 'u': case 'U': return 0 ;
 case 'f': case 'F': return 1 ;
@@ -96,9 +99,9 @@ default:
    }
 }
 int parse_move(const char *p) {
-   skip_whitespace(p) ;
+   skip_whitespace(&p) ;
    const char *q = p ;
-   int f = parse_face(q) ;
+   int f = parse_face(&q) ;
    if (f < 0)
       return -1 ;
    int t = 0 ;
@@ -114,18 +117,18 @@ default:
 }
 /////////////////
 static int parse_cubie(const char **p) {
-   skip_whitespace(*p) ;
+   skip_whitespace(&*p) ;
    int v = 1 ;
    int f = 0 ;
-   while ((f=parse_face(*p)) >= 0) {
+   while ((f=parse_face(&*p)) >= 0) {
       v = v * 6 + f ;
       if (v >= 2 * 6 * 6 * 6)
          return -1 ;
    }
    return v ;
 }
-static int parse_edge(const char *p) {
-   int c = parse_cubie(&p) ;
+static int parse_edge(const char **p) {
+   int c = parse_cubie(&*p) ;
    if (c < 6 * 6 || c >= 2 * 6 * 6)
       return -1 ;
    c = lookup_edge_cubie[c-6*6] ;
@@ -133,8 +136,8 @@ static int parse_edge(const char *p) {
       return -1 ;
    return c ;
 }
-static int parse_corner(const char *p) {
-   int c = parse_cubie(&p) ;
+static int parse_corner(const char **p) {
+   int c = parse_cubie(&*p) ;
    if (c < 6 * 6 * 6 || c >= 2 * 6 * 6 * 6)
       return -1 ;
    c = lookup_corner_cubie[c-6*6*6] ;
@@ -155,20 +158,20 @@ void sm_init() {
    for (i=0; i<CUBIES; i++) {
       const char *tmp = 0 ;
       tmp=smcorners[i];
-      tmp=smcorners[CUBIES+i];
-      tmp=smedges[i];
       lookup_corner_cubie[parse_cubie(&tmp)-6*6*6] = i ;
+      tmp=smcorners[CUBIES+i];
       lookup_corner_cubie[parse_cubie(&tmp)-6*6*6] = CUBIES+i ;
+      tmp=smedges[i];
       lookup_edge_cubie[parse_cubie(&tmp)-6*6] = i ;
    }
    const char *p = sing_solved ;
    for (i=0; i<12; i++) {
-      int cv = parse_edge(p) ;
+      int cv = parse_edge(&p) ;
       sm_edge_order[i] = edge_perm(cv) ;
       sm_edge_flipped[i] = edge_ori(cv) ;
    }
    for (i=0; i<8; i++)
-      sm_corner_order[i] = corner_perm(parse_corner(p)) ;
+      sm_corner_order[i] = corner_perm(parse_corner(&p)) ;
 }
 
 //inverting a corner and edge sequence
@@ -184,8 +187,39 @@ void invert_into(CubePos *old, CubePos *dst)  {
    }
 }
 
+
+const char *parse_Singmaster(CubePos *Result, const char *p) {
+  if (strncmp(p, "SING ", 5) == 0)
+      p+= 5;
+   int m = 0;
+   int i;
+   for (i=0; i<12; i++) {
+      int c = parse_edge(&p) ^ sm_edge_flipped[i];
+       if (c < 0)
+         return "No such edge";
+
+      (*Result).e[edge_perm(c)] = edge_val(sm_edge_order[i], edge_ori(c));
+      m |= 1<<(i);
+   }
+   for (i=0; i<8; i++) {
+      int cval = parse_corner(&p);
+      if (cval < 0)
+         return "No such Corner";
+      (*Result).c[corner_perm(cval)] =  corner_ori_sub(sm_corner_order[i], cval);
+      m |= 1<<(i+12);
+   }
+   skip_whitespace(&p);
+   if (*p) return "Extra stuff after Singmaster representation";
+   if (m != ((1<<20) - 1)) return "Missing at least one cubie";
+   return 0;
+
+}
+
+
 char *Singmaster_string(CubePos *toinvert)  {
+
    CubePos cp ;
+   cube_init(&cp);
    int i;
    invert_into(toinvert, &cp) ;
    char *p = static_buf ;
@@ -200,7 +234,9 @@ char *Singmaster_string(CubePos *toinvert)  {
    for (i=0; i<8; i++) {
       *p++ = ' ' ;
       int j = sm_corner_order[i] ;
+
       const char *q = smcorners[cp.c[j]] ;
+      printf("%d\n\n\n\n\n",cp.c[j]);
       *p++ = *q++ ;
       *p++ = *q++ ;
       *p++ = *q++ ;
@@ -211,20 +247,23 @@ char *Singmaster_string(CubePos *toinvert)  {
 
 
 
-
+/*
 
 int main() {
 
-
    sm_init();
+   CubePos base;
+   cube_init(&base);
 
-   //CubePos base;
-   //cube_init(&base);
-   //print_corners_and_edges(&base);
+   char *sm = "UF UR UB UL DF DR DB DL FR FL BR BL UFR URB UBL ULF DRF DFL DLB DBR ";
+   const char *r;
+   r = "asdas";
+   r = parse_Singmaster(&base, sm);
 
-   //char *a = Singmaster_string(&base);
+   print_corners_and_edges(&base);
 
-   //printf("%s", a);
+   char *a = Singmaster_string(&base);
 
+   printf("%s", a);
 
-}
+}*/
