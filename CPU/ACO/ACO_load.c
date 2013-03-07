@@ -5,7 +5,7 @@
 #include <string.h>
 
 
-#define ITER_MAX 10
+#define ITER_MAX 5
 //evaporation rate
 #define p  0.3
 //influence rate of the pheroneme
@@ -15,40 +15,58 @@
 //Initial level of pheroneme
 #define C 5
 //Pheroneme constant
-#define Q 2
+#define Q 5
 
-void init_graph(int * G, int size)
-{
-    int i,j,index;
-    for(i=0 ; i<size ; i++)
-    {
-        for(j=0 ; j<size ; j++)
-        {
-            index = size*i + j;
-            if(i < j)
-                G[index] = 1;
-            else{
-            G[index] = 0;}
-        }
-    }
+int * load_int(char *file, int * size) {
+
+  FILE *fp = fopen(file, "r");
+  if (fp == NULL) { // check to see if file opens; if NULL, failed
+    printf("Error opening file. \n");
+    return 0;
+  }
+
+  fscanf(fp, "%d", size); // First line of input file is designated as the total number of elements in file; store it into "size"
+
+  int * Array = malloc((*size)*(*size) * sizeof(int));
+  if (Array == NULL) {
+    printf("Out of memory!\n");
+    return 0;
+  }
+  int i=0;
+  while (! feof(fp)) {
+    fscanf(fp, "%d", &Array[i]);// Store all numbers into Array
+    i++;
+  }
+
+  fclose(fp);
+  return(Array); // Return array for main.c
 }
 
-//function that initialize the pheroneme to a constant value
-void init_pheroneme(float * T, int size)
-{
-    int i,j,index;
-    for(i=0 ; i<size ; i++)
-    {
-        for(j=0 ; j<size ; j++)
-        {
-            index = size*i + j;
-            if(i < j)
-                T[index] = C;
-            else{
-            T[index] = 0;}
-        }
-    }
+float * load_float(char *file, int * size) {
+
+  FILE *fp = fopen(file, "r");
+  if (fp == NULL) { // check to see if file opens; if NULL, failed
+    printf("Error opening file. \n");
+    return 0;
+  }
+
+  fscanf(fp, "%d", size); // First line of input file is designated as the total number of elements in file; store it into "size"
+
+  float * Array = malloc((*size)*(*size) * sizeof(float));
+  if (Array == NULL) {
+    printf("Out of memory!\n");
+    return 0;
+  }
+  int i=0;
+  while (! feof(fp)) {
+    fscanf(fp, "%f", &Array[i]);// Store all numbers into Array
+    i++;
+  }
+
+  fclose(fp);
+  return(Array); // Return array for main.c
 }
+
 
 void update_pheroneme1(float * T, int size, int * sol, int length_sol)
 {
@@ -89,7 +107,7 @@ void update_prob(int * G, float * T, float * P, int size, float * sum)
         for(j=0 ; j<size ; j++)
         {
             index = size*i + j;
-            if(i < j)
+            if(G[index] != 0 && T[index] != 0)
             {
                 P[index] = pow(T[index],alpha) * pow(1/G[index],beta)/sum[i];
             }
@@ -110,7 +128,7 @@ float * sum_prob(int * G, float * T, int size)
         for(j=0 ; j<size ; j++)
         {
             index = size*i + j;
-            if(i < j){
+            if(G[index] != 0 && T[index] != 0){
                 sum[i] += pow(T[index],alpha) * pow(1/G[index],beta);
             }
         }
@@ -149,23 +167,18 @@ void print_float(float * data, int size)
 int main()
 {
     //Let's denote n the number of nodes
-    //and N the size of the problem
-    int n = 5;
-    int N = n*n;
-    //We define the graph using a matrix of size N
-    //This matrix contain the distance between each node
-    //if two nodes are not connected then the value is 0
-    int * G = malloc(sizeof(int)*N);
+    int n;
+
+    //We define the graph using a matrix of size n*n
+    //We load it from the file graph.txt
+    int * G = load_int("graph1.txt",&n);
 
     //We define the level of pheroneme for each edge in a matrix
-    float * T = malloc(sizeof(float)*N);
+    //We load it from the file pheroneme.txt
+    float * T = load_float("pheroneme1.txt",&n);
 
     //We define the matrice of the probabilities
     float * P = malloc(sizeof(float)*n*n);
-
-    //Initialize the graph and the level of pheroneme
-    init_graph(G,n);
-    init_pheroneme(T,n);
 
     //Initialize the probabilities
     float * sum = sum_prob(G,T,n);
