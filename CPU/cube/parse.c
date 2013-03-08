@@ -10,6 +10,11 @@
 #include "core.c"
 #endif
 
+
+//maco function to initialize the singmaster parsing of the cube
+#define INIT_CUBE_PARSE() sm_init();
+
+
 //this file is about parsing a string in singmaster's notation and ouptutting a 
 //string that's reformatted to the internal representation of the cube
 
@@ -236,7 +241,6 @@ char *Singmaster_string(CubePos *toinvert)  {
       int j = sm_corner_order[i] ;
 
       const char *q = smcorners[cp.c[j]] ;
-      printf("%d\n\n\n\n\n",cp.c[j]);
       *p++ = *q++ ;
       *p++ = *q++ ;
       *p++ = *q++ ;
@@ -247,23 +251,3 @@ char *Singmaster_string(CubePos *toinvert)  {
 
 
 
-/*
-
-int main() {
-
-   sm_init();
-   CubePos base;
-   cube_init(&base);
-
-   char *sm = "UF UR UB UL DF DR DB DL FR FL BR BL UFR URB UBL ULF DRF DFL DLB DBR ";
-   const char *r;
-   r = "asdas";
-   r = parse_Singmaster(&base, sm);
-
-   print_corners_and_edges(&base);
-
-   char *a = Singmaster_string(&base);
-
-   printf("%s", a);
-
-}*/
