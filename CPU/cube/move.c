@@ -9,7 +9,29 @@
 #endif
 
 
-#include "parse.c"
+#define UP 0
+#define UP2 1
+#define UPC 2
+#define FRONT 3
+#define FRONT2 4
+#define FRONTC 5
+#define RIGHT 6
+#define RIGHT2 7
+#define RIGHTC 8
+#define DOWN 9
+#define DOWN2 10
+#define DOWNC 11
+#define BACK 12
+#define BACK2 13
+#define BACKC 14
+#define LEFT  15 
+#define LEFT2 16
+#define LEFTC 17
+
+
+//maco function to initialize the moves of the cube
+#define INIT_CUBE_MOVES()  init_twist_table();permute_twist_table();
+
 
 /************************************************************************************************************
 *																											*
@@ -210,28 +232,4 @@ void move(CubePos *C, int mov) {
 
 
 
-int main() {
-sm_init();
-	init_twist_table();
-	permute_twist_table();
-	CubePos base;
-	cube_init(&base);
 
-	printf("\n\n\n");
-    move(&base, 0);
-
-
-	print_corners_and_edges(&base);
-
-   char *sm = "UF UR UB UL DF DR DB DL FR FL BR BL UFR URB UBL ULF DRF DFL DLB DBR ";
-   const char *r;
-   r = "asdas";
-   //r = parse_Singmaster(&base, sm);
-
-   print_corners_and_edges(&base);
-
-   char *a = Singmaster_string(&base);
-
-   printf("%s", a);
-
-}
