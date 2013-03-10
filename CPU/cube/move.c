@@ -11,22 +11,22 @@
 
 #define UP 0
 #define UP2 1
-#define UPC 2
+#define UPA 2
 #define FRONT 3
 #define FRONT2 4
-#define FRONTC 5
+#define FRONTA 5
 #define RIGHT 6
 #define RIGHT2 7
-#define RIGHTC 8
+#define RIGHTA 8
 #define DOWN 9
 #define DOWN2 10
-#define DOWNC 11
+#define DOWNA 11
 #define BACK 12
 #define BACK2 13
-#define BACKC 14
+#define BACKA 14
 #define LEFT  15 
 #define LEFT2 16
-#define LEFTC 17
+#define LEFTA 17
 
 
 //maco function to initialize the moves of the cube
