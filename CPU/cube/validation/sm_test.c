@@ -19,8 +19,6 @@ int main(int argc,char ** argv) {
    CubePos base;
    CubePos test;
    cube_init(&base);
-   //print_corners_and_edges(&base);
-  
   
   for (i=1; i< argc; i++) {
 	  move(&base, (int)atoi(argv[i]));

@@ -17,19 +17,11 @@ int i;
 
    CubePos base;
    cube_init(&base);
-   //print_corners_and_edges(&base);
-   
 
   for (i=1; i< argc; i++) {
     move(&base, (int)atoi(argv[i]));
 }
-  // print_corners_and_edges(&base);
-
-   char *sm = "UF UR UB UL DF DR DB DL FR FL BR BL UFR URB UBL ULF DRF DFL DLB DBR ";
-   const char *r;
-   
-   //r = parse_Singmaster(&base, sm);
-
+   //"UF UR UB UL DF DR DB DL FR FL BR BL UFR URB UBL ULF DRF DFL DLB DBR ";
    char *a = Singmaster_string(&base);
 
    printf("%s", a);
