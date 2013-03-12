@@ -1,6 +1,13 @@
 #include "cutil_inline.h"
 #include "math.h"
 
+
+//cube libraries
+
+//rubik's cube libs
+#include "../CPU/cube/parse.c"
+#include "../CPU/cube/move.c"
+
 /*ACO parameters*/
 	//Number of nodes in the graph
 	#define GRAPH_SIZE 1024
@@ -190,3 +197,12 @@ void datainit_pheroneme(float* data, int size)
 
 }
 
+
+void datainit_graph_cube(int *graph,int max_depth) {
+
+    //calculate the number of nodes available
+    long num_nodes = max_cube_moves(max_depth);
+
+    
+
+}
