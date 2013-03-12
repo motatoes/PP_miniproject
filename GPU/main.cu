@@ -38,6 +38,10 @@
 /*End GPU parameters*/
 
 
+//function prototypes
+float* sum_probability(int* h_graph, float* h_pheroneme, int size);
+void update_probability(int* h_graph,float* h_pheroneme,float* h_probability, int size, float* sum)
+;
 //a macro function that takes as parameters the indexes
 //of a 2d matrix and it's row size, and returns the 
 //serialized index
@@ -53,7 +57,7 @@ __global__ void ACO_kernel(int* d_graph, float* d_pheroneme, float* d_probabilit
 {
   //1) generate a solution (haithem)
   //2) update the pheroneme based on the solution(mohamed)
-  int tid = ThreadIdx.x;
+  int tid = threadIdx.x;
 
 }
   
@@ -199,6 +203,24 @@ void datainit_graph_cube(int *graph,int max_depth) {
     //calculate the number of nodes available
     long num_nodes = max_cube_moves(max_depth);
 
+    //calculate the number of nodes that are at depth max_depth -1
+    long num_nodes_at_depth_minus_one = max_cube_moves(max_depth - 1);
+    int i;
+
+    for (i=0 ; i < num_nodes_at_depth_minus_one; i++) {
+      if ( i >= i * 18 && i < (i * 18 + 18) ) {
+        graph[i] = 1;
+      }
+      else {
+        graph[i] = 0;
+       }
+    }
+
+    //put zeros in the last level of nodes
+    for (i=num_nodes_at_depth_minus_one ; i < num_nodes; i++) {
+      graph[i] = 0;
+    }
+/*
     int i,j;
     //start from node 2, and keep track of the next node number
     int current_node = 2;
@@ -229,10 +251,10 @@ void datainit_graph_cube(int *graph,int max_depth) {
 
         }
     }   
-
+*/
 }
 
-float* sum_prob(int* graph, float* pheroneme, int size)
+
 
 void update_pheroneme(float* h_pheroneme, int size)
 {
@@ -272,7 +294,7 @@ float* sum_probability(int* h_graph, float* h_pheroneme, int size)
 }
 
 
-void update_probability(float* h_graph,float* h_pheroneme,float* h_probability, int size, float* sum)
+void update_probability(int* h_graph,float* h_pheroneme,float* h_probability, int size, float* sum)
 {
     //same methode as the CPU version
     int i,j,index;
