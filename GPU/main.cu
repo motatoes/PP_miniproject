@@ -202,11 +202,40 @@ void datainit_pheroneme(float* pheroneme, int size)
 
 
 void datainit_graph_cube(int *graph,int max_depth) {
-
+    
     //calculate the number of nodes available
     long num_nodes = max_cube_moves(max_depth);
 
-    
+    int i,j;
+    //start from node 2, and keep track of the next node number
+    int current_node = 2;
+
+
+    //initialize the first row
+    for (i =0; i < num_nodes; i++) {
+
+          int index = SERIALIZE(i,j,18);
+            graph[index] = 0;
+            current_node++:      
+    }
+
+
+    for (i =0; i < num_nodes; i++) {
+
+        for (j=0; j<18; j++) {
+
+          int index = SERIALIZE(i,j,18);
+
+          if () { 
+            graph[index] = current_node;
+            current_node++:
+          }
+          else {
+            graph[index] = 0;
+          }
+
+        }
+    }   
 
 }
 
