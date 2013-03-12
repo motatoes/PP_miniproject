@@ -29,6 +29,11 @@
 /*End GPU parameters*/
 
 
+//a macro function that takes as parameters the indexes
+//of a 2d matrix and it's row size, and returns the 
+//serialized index
+#define SERIALIZE(i,j,row_size) i * row_size + j;
+
 
 //functions prototypes
 void datainit_graph(int*, int);
@@ -146,12 +151,42 @@ int main(int argc, char** argv)
 
 // 
 void datainit_graph(int* data, int size)
-{
+{    
+    //same method as the CPU version
+    int i,j,index;
+    for(i=0 ; i<size ; i++)
+    {
+        for(j=0 ; j<size ; j++)
+        {
+            index = SERIALIZE(i,j,size);
+
+            if(i < j) {
+
+                data[index] = 1;
+            }
+            else {
+            data[index] = 0;
+          }
+        }
+    }
  
 }
 
 void datainit_pheroneme(float* data, int size)
 {
- 
+  //same method as the CPU version
+      int i,j,index;
+    for(i=0 ; i<size ; i++)
+    {
+        for(j=0 ; j<size ; j++)
+        {
+            index = SERIALIZE(i,j,size);
+            if(i < j)
+                data[index] = INIT_PHERONEME;
+            else{
+            data[index] = 0;}
+        }
+    }
+
 }
 
