@@ -232,4 +232,15 @@ void move(CubePos *C, int mov) {
 
 
 
+long max_cube_moves(int n) {
+	long sum =1;
+
+	int i;
+	for (int i =0; i<n; i++) {
+		sum += 18 * pow(15,i);
+	}
+
+}
+
+
 
