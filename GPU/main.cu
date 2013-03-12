@@ -1,5 +1,7 @@
-#include "cutil_inline.h"
-#include "math.h"
+#include <cutil_inline.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
 
 /*ACO parameters*/
 	//Number of nodes in the graph
@@ -150,7 +152,7 @@ int main(int argc, char** argv)
 }
 
 // 
-void datainit_graph(int* data, int size)
+void datainit_graph(int* graph, int size)
 {    
     //same method as the CPU version
     int i,j,index;
@@ -162,31 +164,70 @@ void datainit_graph(int* data, int size)
 
             if(i < j) {
 
-                data[index] = 1;
+                graph[index] = 1;
             }
             else {
-            data[index] = 0;
+            graph[index] = 0;
           }
         }
     }
  
 }
 
-void datainit_pheroneme(float* data, int size)
+void datainit_pheroneme(float* pheroneme, int size)
 {
   //same method as the CPU version
-      int i,j,index;
+    int i,j,index;
     for(i=0 ; i<size ; i++)
     {
         for(j=0 ; j<size ; j++)
         {
             index = SERIALIZE(i,j,size);
             if(i < j)
-                data[index] = INIT_PHERONEME;
+                pheroneme[index] = INIT_PHERONEME;
             else{
-            data[index] = 0;}
+            pheroneme[index] = 0;}
         }
     }
 
 }
 
+float* sum_prob(int* graph, float* pheroneme, int size)
+{
+    int i,j,index;
+    float* sum = (float*)malloc(sizeof(float)*size);
+    for(i=0 ; i<size ; i++)
+    {
+        sum[i]=0;
+        for(j=0 ; j<size ; j++)
+        {
+            index = SERIALIZE(i,j,size);
+            if(graph[index] != 0 && pheroneme[index] != 0){
+                sum[i] += pow(pheroneme[index],ALPHA) * pow(1/graph[index],BETA);
+            }
+        }
+    }
+    return sum;
+}
+
+
+void update_probability(float* graph,float* pheroneme,float* probabilities, int size, float* sum)
+{
+    //same methode as the CPU version
+    int i,j,index;
+    for(i=0 ; i<size ; i++)
+    {
+        for(j=0 ; j<size ; j++)
+        {
+            index = SERIALIZE(i,j,size);
+            if(graph[index] != 0 && pheroneme[index] != 0)
+            {
+                probabilities[index] = pow(pheroneme[index],ALPHA) * pow(1/graph[index],BETA)/sum[i];
+            }
+            else{
+                probabilities[index] = 0;
+            }
+        }
+    }
+
+}
