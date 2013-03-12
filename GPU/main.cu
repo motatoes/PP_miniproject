@@ -42,26 +42,12 @@ void datainit_graph(int*, int);
 void datainit_pheroneme(float*, int);
 
 
-
-//Use global parameter for the size and nsteps
-__device__ float* sum_probability(int* d_graph, float* d_pheroneme)
+__global__ void ACO_kernel(int* d_graph, float* d_pheroneme, float* d_probability, int* d_solutions)
 {
-  return 0;
-}
-__device__ void update_probability(int* d_graph, float* d_pheroneme, float* d_probability, float* sum)
-{
+  //1) generate a solution (haithem)
+  //2) update the pheroneme based on the solution(mohamed)
+  int tid = ThreadIdx.x;
 
-} 
-
-
-__global__ void ACO_kernel(int* d_graph, float* d_pheroneme, int* d_solutions)
-{
-  
-  //1) sum the probabilities
-  //2) initialise the probabilities
-  //3) generate the solutions
-  //4) update the pheroneme
-  //5) update the probabilities
 }
   
 
@@ -73,19 +59,23 @@ int main(int argc, char** argv)
 
 
   // allocate host memory 
-  unsigned int size     = GRAPH_SIZE*GRAPH_SIZE;             
-  unsigned int mem_size = sizeof(int) * size;     
-  int *   h_graph     = (int*)malloc(mem_size); 
-  float * h_pheroneme = (float*)malloc(mem_size);
-  int *   h_solutions = (int*)malloc(mem_size); 
+  unsigned int nb_node   = GRAPH_SIZE; 
+  unsigned int size      = GRAPH_SIZE*GRAPH_SIZE;             
+  unsigned int mem_size  = sizeof(int) * size;     
+  int*   h_graph         = (int*)malloc(mem_size); 
+  float* h_pheroneme     = (float*)malloc(mem_size);
+  float* h_probability   = (float*)malloc(mem_size);
+  int*   h_solutions     = (int*)malloc(mem_size); 
 
   printf("Input size : %d\n", GRAPH_SIZE);
   printf("Grid size  : %d\n", GRID_SIZE);
   printf("Block size : %d\n", BLOCK_SIZE);
 
-  //Initialise the graph and the pheroneme
-  datainit_graph(h_graph, size);
-  datainit_pheroneme(h_pheroneme, size);
+  //Initialise the graph, the pheroneme and the probabilities
+  datainit_graph(h_graph, nb_node);
+  datainit_pheroneme(h_pheroneme, nb_node);
+  float* sum =sum_probability(h_graph, h_pheroneme, nb_node);
+  update_probability(h_graph, h_pheroneme, h_probability, nb_node, sum);
   
   // allocate device memory
   int* d_graph;
@@ -105,7 +95,10 @@ int main(int argc, char** argv)
 				      mem_size, cudaMemcpyHostToDevice));
 
   cutilSafeCall(cudaMemcpy(d_pheroneme, h_pheroneme, 
-				      mem_size, cudaMemcpyHostToDevice)); 
+				      mem_size, cudaMemcpyHostToDevice));
+
+   cutilSafeCall(cudaMemcpy(d_probability, h_probability, 
+              mem_size, cudaMemcpyHostToDevice));             
 
   // set up kernel for execution
   printf("Run %d Kernels.\n\n", ITER_BENCHMARK);
@@ -116,7 +109,7 @@ int main(int argc, char** argv)
 
 // execute kernel
   for (int j = 0; j < ITER_BENCHMARK; j++) 
-      ACO_kernel<<<GRID_SIZE, BLOCK_SIZE >>>(d_graph, d_pheroneme,d_solutions);
+      ACO_kernel<<<GRID_SIZE, BLOCK_SIZE >>>(d_graph, d_pheroneme, d_probability, d_solutions);
 
   // check if kernel execution generated and error
   cutilCheckMsg("Kernel execution failed");
@@ -141,6 +134,7 @@ int main(int argc, char** argv)
   // clean up memory
   free(h_graph);
   free(h_pheroneme);
+  free(h_probability);
   free(h_solutions);
   cutilSafeCall(cudaFree(d_graph));
   cutilSafeCall(cudaFree(d_pheroneme));
@@ -152,7 +146,7 @@ int main(int argc, char** argv)
 }
 
 // 
-void datainit_graph(int* graph, int size)
+void datainit_graph(int* h_graph, int size)
 {    
     //same method as the CPU version
     int i,j,index;
@@ -164,17 +158,17 @@ void datainit_graph(int* graph, int size)
 
             if(i < j) {
 
-                graph[index] = 1;
+                h_graph[index] = 1;
             }
             else {
-            graph[index] = 0;
+            h_graph[index] = 0;
           }
         }
     }
  
 }
 
-void datainit_pheroneme(float* pheroneme, int size)
+void datainit_pheroneme(float* h_pheroneme, int size)
 {
   //same method as the CPU version
     int i,j,index;
@@ -184,15 +178,33 @@ void datainit_pheroneme(float* pheroneme, int size)
         {
             index = SERIALIZE(i,j,size);
             if(i < j)
-                pheroneme[index] = INIT_PHERONEME;
+                h_pheroneme[index] = INIT_PHERONEME;
             else{
-            pheroneme[index] = 0;}
+            h_pheroneme[index] = 0;}
         }
     }
 
 }
 
-float* sum_prob(int* graph, float* pheroneme, int size)
+void update_pheroneme(float* h_pheroneme, int size)
+{
+    int i,j,index;
+    //evaporation
+    for(i=0 ; i<size ; i++)
+    {
+        for(j=0 ; j<size ; j++)
+        {
+            index = SERIALIZE(i,j,size);
+            if(h_pheroneme[index] != 0)
+            {
+                h_pheroneme[index] = (1-EVAP_RATE) * h_pheroneme[index];
+            }
+        }
+    }
+}
+
+
+float* sum_probability(int* h_graph, float* h_pheroneme, int size)
 {
     int i,j,index;
     float* sum = (float*)malloc(sizeof(float)*size);
@@ -202,8 +214,8 @@ float* sum_prob(int* graph, float* pheroneme, int size)
         for(j=0 ; j<size ; j++)
         {
             index = SERIALIZE(i,j,size);
-            if(graph[index] != 0 && pheroneme[index] != 0){
-                sum[i] += pow(pheroneme[index],ALPHA) * pow(1/graph[index],BETA);
+            if(h_graph[index] != 0 && h_pheroneme[index] != 0){
+                sum[i] += pow(h_pheroneme[index],ALPHA) * pow(1/h_graph[index],BETA);
             }
         }
     }
@@ -211,7 +223,7 @@ float* sum_prob(int* graph, float* pheroneme, int size)
 }
 
 
-void update_probability(float* graph,float* pheroneme,float* probabilities, int size, float* sum)
+void update_probability(float* h_graph,float* h_pheroneme,float* h_probability, int size, float* sum)
 {
     //same methode as the CPU version
     int i,j,index;
@@ -220,12 +232,12 @@ void update_probability(float* graph,float* pheroneme,float* probabilities, int 
         for(j=0 ; j<size ; j++)
         {
             index = SERIALIZE(i,j,size);
-            if(graph[index] != 0 && pheroneme[index] != 0)
+            if(h_graph[index] != 0 && h_pheroneme[index] != 0)
             {
-                probabilities[index] = pow(pheroneme[index],ALPHA) * pow(1/graph[index],BETA)/sum[i];
+                h_probability[index] = pow(h_pheroneme[index],ALPHA) * pow(1/h_graph[index],BETA)/sum[i];
             }
             else{
-                probabilities[index] = 0;
+                h_probability[index] = 0;
             }
         }
     }
