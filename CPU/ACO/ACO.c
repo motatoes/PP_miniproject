@@ -5,148 +5,16 @@
 #include <string.h>
 
 
-#define ITER_MAX 10
-//evaporation rate
-#define p  0.3
-//influence rate of the pheroneme
-#define alpha 0.8
-//influence rate of the heuristic (distance)
-#define beta 0.2
-//Initial level of pheroneme
-#define C 5
-//Pheroneme constant
-#define Q 2
+//libs
+#include "constant.h"
+#include "util.c"
+#include "pheroneme.c"
+#include "probability.c"
+#include "graph.c"
 
-void init_graph(int * G, int size)
-{
-    int i,j,index;
-    for(i=0 ; i<size ; i++)
-    {
-        for(j=0 ; j<size ; j++)
-        {
-            index = size*i + j;
-            if(i < j)
-                G[index] = 1;
-            else{
-            G[index] = 0;}
-        }
-    }
-}
 
-//function that initialize the pheroneme to a constant value
-void init_pheroneme(float * T, int size)
-{
-    int i,j,index;
-    for(i=0 ; i<size ; i++)
-    {
-        for(j=0 ; j<size ; j++)
-        {
-            index = size*i + j;
-            if(i < j)
-                T[index] = C;
-            else{
-            T[index] = 0;}
-        }
-    }
-}
 
-void update_pheroneme1(float * T, int size, int * sol, int length_sol)
-{
-
-    //update based on constructed solution
-    int i=0;
-    while(sol[i] != size-1)
-    {
-        T[size*sol[i] + sol[i+1]] += Q/length_sol;
-        i++;
-    }
-
-}
-
-void update_pheroneme2(float * T, int size)
-{
-    int i,j,index;
-
-    //evaporation
-    for(i=0 ; i<size ; i++)
-    {
-        for(j=0 ; j<size ; j++)
-        {
-            index = size*i + j;
-            if(i < j)
-            {
-                T[index] = (1-p) * T[index];
-            }
-        }
-    }
-}
-
-void update_prob(int * G, float * T, float * P, int size, float * sum)
-{
-    int i,j,index;
-    for(i=0 ; i<size ; i++)
-    {
-        for(j=0 ; j<size ; j++)
-        {
-            index = size*i + j;
-            if(i < j)
-            {
-                P[index] = pow(T[index],alpha) * pow(1/G[index],beta)/sum[i];
-            }
-            else{
-                P[index] = 0;
-            }
-        }
-    }
-}
-
-float * sum_prob(int * G, float * T, int size)
-{
-    int i,j,index;
-    float * sum = malloc(sizeof(float)*size);
-    for(i=0 ; i<size ; i++)
-    {
-        sum[i]=0;
-        for(j=0 ; j<size ; j++)
-        {
-            index = size*i + j;
-            if(i < j){
-                sum[i] += pow(T[index],alpha) * pow(1/G[index],beta);
-            }
-        }
-    }
-    return sum;
-}
-
-void print_int(int * data, int size)
-{
-    int i,j,index;
-    for(i=0 ; i<size ; i++)
-    {
-        for(j=0 ; j<size ; j++)
-        {
-            index = size*i + j;
-            printf("%d ",data[index]);
-        }
-        printf("\n");
-    }
-}
-
-void print_float(float * data, int size)
-{
-    int i,j,index;
-    for(i=0 ; i<size ; i++)
-    {
-        for(j=0 ; j<size ; j++)
-        {
-            index = size*i + j;
-            printf("%f ",data[index]);
-        }
-        printf("\n");
-    }
-}
-
-int main()
+int main(int argc, char **argv)
 {
     //Let's denote n the number of nodes
     //and N the size of the problem
