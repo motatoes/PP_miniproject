@@ -1,16 +1,18 @@
 
-
+//Number of nodes in the graph
+#define GRAPH_SIZE 5
+//Number of iteration in ACO algorithm
 #define ITER_MAX 10
 //evaporation rate
-#define p  0.3
+#define EVAP_RATE 0.3
 //influence rate of the pheroneme
-#define alpha 0.8
+#define ALPHA 0.8
 //influence rate of the heuristic (distance)
-#define beta 0.2
+#define BETA 0.2
 //Initial level of pheroneme
-#define C 5
-//Pheroneme constant
-#define Q 2
-
-
+#define INIT_PHERONEME 5
+//Update pheroneme constant
+#define UPDT_PHERONEME_CONST 2
+//Number of ants
+#define NB_ANT 2
 

@@ -11,7 +11,7 @@ void init_pheroneme(float * T, int size)
         {
             index = size*i + j;
             if(i < j)
-                T[index] = C;
+                T[index] = INIT_PHERONEME;
             else{
             T[index] = 0;}
         }
@@ -27,7 +27,7 @@ void update_pheroneme1(float * T, int size, int * sol, int length_sol)
     int i=0;
     while(sol[i] != size-1)
     {
-        T[size*sol[i] + sol[i+1]] += Q/length_sol;
+        T[size*sol[i] + sol[i+1]] += UPDT_PHERONEME_CONST/length_sol;
         i++;
     }
 
@@ -45,7 +45,7 @@ void update_pheroneme2(float * T, int size)
             index = size*i + j;
             if(i < j)
             {
-                T[index] = (1-p) * T[index];
+                T[index] = (1-EVAP_RATE) * T[index];
             }
         }
     }
