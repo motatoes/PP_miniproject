@@ -43,7 +43,7 @@ void update_pheroneme2(float * T, int size)
         for(j=0 ; j<size ; j++)
         {
             index = size*i + j;
-            if(i < j)
+            if(T[index] != 0)
             {
                 T[index] = (1-EVAP_RATE) * T[index];
             }
