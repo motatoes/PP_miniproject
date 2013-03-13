@@ -235,13 +235,15 @@ int* best_solution;
           cutilSafeCall(cudaMemcpy(d_probability, h_probability, 
               mem_size_graph_float, cudaMemcpyHostToDevice));
 
-  // printf("the best path is: \n");
-  // int i = 0;
-  // while(best_solution[i] != GRAPH_SIZE-1)
-  // {
-  //   printf("%d ",best_solution[i]);
-  // }
-
+  printf("the best path is: \n");
+  int i = 1;
+  printf("%d ",best_solution[0]);
+  while(best_solution[i-1] != GRAPH_SIZE-1)
+  {
+    printf("%d ",best_solution[i]);
+    i++;
+  }
+  printf("\n");
   printf("last set of solutions \n");
   int index;
   for(int i=0; i<nb_ant; i++)
