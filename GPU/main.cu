@@ -280,8 +280,8 @@ void datainit_graph_cube(int *graph,int max_depth) {
 
         }
     }   
-*/
 }
+*/
 
 
 
