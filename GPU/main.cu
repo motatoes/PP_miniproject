@@ -197,7 +197,37 @@ void datainit_pheroneme(float* h_pheroneme, int size)
 
 }
 
+void datainit_graph_cube(int *graph,int max_depth) {
+    
+    //calculate the number of nodes available
+    long num_nodes = max_cube_moves(max_depth);
 
+    //calculate the number of nodes that are at depth max_depth -1
+    long num_nodes_at_depth_minus_one = max_cube_moves(max_depth - 1);
+    int i, j;
+    int k =0;
+    for (i=0 ; i < num_nodes_at_depth_minus_one; i++) {
+      for (j=0 ; j < num_nodes; j++) {
+
+        if ( ( j >= i * 18 + 1  && j< i*18 +1+k ) || ( j>=i*18+1+k+3 && j < (i * 18 + 18 + 1) ) ) {
+          graph[i * num_nodes + j] = 1;
+        }
+        else {
+          graph[i * num_nodes + j] = 0;
+         }
+      }
+	if (i != 0 && i%3==0) k+=3;
+    }
+
+    //put zeros in the last level of nodes
+    for (i=num_nodes_at_depth_minus_one ; i < num_nodes; i++) {
+      for (j=0 ; j < num_nodes; j++) {
+          graph[i * num_nodes + j] = 0;
+      }
+    }
+}
+
+/*
 void datainit_graph_cube(int *graph,int max_depth) {
     
     //calculate the number of nodes available
@@ -220,7 +250,6 @@ void datainit_graph_cube(int *graph,int max_depth) {
     for (i=num_nodes_at_depth_minus_one ; i < num_nodes; i++) {
       graph[i] = 0;
     }
-/*
     int i,j;
     //start from node 2, and keep track of the next node number
     int current_node = 2;
