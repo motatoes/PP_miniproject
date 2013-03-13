@@ -82,13 +82,6 @@ void skip_whitespace(const char **p)   {
       (*p)++ ;
     }
 }
-
-int parse_face(const char **p) {
-   int f = parse_face_from_char(*p) ;
-   if (f >= 0)
-      (*p)++ ;
-   return f ; 
-}
 int parse_face_from_char(const char *f) {
 
 
@@ -103,6 +96,13 @@ default:
       return -1 ;
    }
 }
+int parse_face(const char **p) {
+   int f = parse_face_from_char(*p) ;
+   if (f >= 0)
+      (*p)++ ;
+   return f ; 
+}
+
 int parse_move(const char *p) {
    skip_whitespace(&p) ;
    const char *q = p ;

@@ -3,6 +3,13 @@
 #include <stdlib.h>
 #include <math.h>
 
+
+//cube libraries
+
+//rubik's cube libs
+#include "../CPU/cube/parse.c"
+#include "../CPU/cube/move.c"
+
 /*ACO parameters*/
 	//Number of nodes in the graph
 	#define GRAPH_SIZE 1024
@@ -31,6 +38,10 @@
 /*End GPU parameters*/
 
 
+//function prototypes
+float* sum_probability(int* h_graph, float* h_pheroneme, int size);
+void update_probability(int* h_graph,float* h_pheroneme,float* h_probability, int size, float* sum)
+;
 //a macro function that takes as parameters the indexes
 //of a 2d matrix and it's row size, and returns the 
 //serialized index
@@ -46,7 +57,7 @@ __global__ void ACO_kernel(int* d_graph, float* d_pheroneme, float* d_probabilit
 {
   //1) generate a solution (haithem)
   //2) update the pheroneme based on the solution(mohamed)
-  int tid = ThreadIdx.x;
+  int tid = threadIdx.x;
 
 }
   
@@ -186,6 +197,124 @@ void datainit_pheroneme(float* h_pheroneme, int size)
 
 }
 
+
+void datainit_graph_cube(int *graph,int max_depth) {
+    
+    int i, j;
+
+    //calculate the number of nodes available
+    long num_nodes = max_cube_moves(max_depth);
+
+    //calculate the number of nodes that are at depth max_depth -1
+    long num_nodes_at_depth_minus_one = max_cube_moves(max_depth - 1);
+
+
+    //let's initialize the first row separately because it doesn't follow the trend
+    for (j=1 ; j < num_nodes; j++) {
+    
+        int index = SERIALIZE(0,j,num_nodes);
+        if (j < 19 ) {
+          graph[index] = 1;
+        }
+        else {
+          graph[index] = 0;
+        }
+      }
+    
+    // we do the rest of the rows that contain "1's"
+    // Since it's a tree, we shift to the right in each row
+    //because the nodes are only connected to only 15 other nodes, 
+      //we skip three nodes in each row because after doing a move,
+      //we don't want to do a same-face rotation again
+      // 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+      // 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0
+      // 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0
+      // 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0
+      // 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0
+      //....
+    for (i=1 ; i < num_nodes_at_depth_minus_one; i++) {
+      for (j=0 ; j < num_nodes; j++) {
+
+        int index = SERIALIZE(i,j,num_nodes);
+
+        if (  ( j >= 18 + (i-1) * 15 + 1) &&   j < (18 + (i-1) * 15 + 15 + 1     ) )  {
+
+          graph[index] = 1;
+        
+        }
+        else {
+          graph[index] = 0;
+         }
+      }
+
+    }
+
+    //put zeros in the last level of nodes
+    for (i=num_nodes_at_depth_minus_one ; i < num_nodes; i++) {
+      for (j=0 ; j < num_nodes; j++) {
+          graph[i * num_nodes + j] = 0;
+      }
+    }
+}
+
+/*
+void datainit_graph_cube(int *graph,int max_depth) {
+    
+    //calculate the number of nodes available
+    long num_nodes = max_cube_moves(max_depth);
+
+    //calculate the number of nodes that are at depth max_depth -1
+    long num_nodes_at_depth_minus_one = max_cube_moves(max_depth - 1);
+    int i;
+
+    for (i=0 ; i < num_nodes_at_depth_minus_one; i++) {
+      if ( i >= i * 18 + 1 && i < (i * 18 + 18) ) {
+        graph[i] = 1;
+      }
+      else {
+        graph[i] = 0;
+       }
+    }
+
+    //put zeros in the last level of nodes
+    for (i=num_nodes_at_depth_minus_one ; i < num_nodes; i++) {
+      graph[i] = 0;
+    }
+    int i,j;
+    //start from node 2, and keep track of the next node number
+    int current_node = 2;
+
+
+    //initialize the first row
+    for (i =0; i < num_nodes; i++) {
+
+          int index = SERIALIZE(i,j,18);
+            graph[index] = 0;
+            current_node++:      
+    }
+
+
+    for (i =0; i < num_nodes; i++) {
+
+        for (j=0; j<18; j++) {
+
+          int index = SERIALIZE(i,j,18);
+
+          if () { 
+            graph[index] = current_node;
+            current_node++:
+          }
+          else {
+            graph[index] = 0;
+          }
+
+        }
+    }   
+}
+*/
+
+
+
 void update_pheroneme(float* h_pheroneme, int size)
 {
     int i,j,index;
@@ -205,6 +334,7 @@ void update_pheroneme(float* h_pheroneme, int size)
 
 
 float* sum_probability(int* h_graph, float* h_pheroneme, int size)
+
 {
     int i,j,index;
     float* sum = (float*)malloc(sizeof(float)*size);
@@ -223,7 +353,7 @@ float* sum_probability(int* h_graph, float* h_pheroneme, int size)
 }
 
 
-void update_probability(float* h_graph,float* h_pheroneme,float* h_probability, int size, float* sum)
+void update_probability(int* h_graph,float* h_pheroneme,float* h_probability, int size, float* sum)
 {
     //same methode as the CPU version
     int i,j,index;
@@ -243,3 +373,4 @@ void update_probability(float* h_graph,float* h_pheroneme,float* h_probability, 
     }
 
 }
+
