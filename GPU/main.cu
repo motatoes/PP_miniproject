@@ -208,7 +208,7 @@ void datainit_graph_cube(int *graph,int max_depth) {
     int i;
 
     for (i=0 ; i < num_nodes_at_depth_minus_one; i++) {
-      if ( i >= i * 18 && i < (i * 18 + 18) ) {
+      if ( i >= i * 18 + 1 && i < (i * 18 + 18) ) {
         graph[i] = 1;
       }
       else {
