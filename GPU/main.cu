@@ -199,24 +199,55 @@ void datainit_pheroneme(float* h_pheroneme, int size)
 
 void datainit_graph_cube(int *graph,int max_depth) {
     
+    int i, j;
+    int k =0;
+
     //calculate the number of nodes available
     long num_nodes = max_cube_moves(max_depth);
 
     //calculate the number of nodes that are at depth max_depth -1
     long num_nodes_at_depth_minus_one = max_cube_moves(max_depth - 1);
-    int i, j;
-    int k =0;
-    for (i=0 ; i < num_nodes_at_depth_minus_one; i++) {
-      for (j=0 ; j < num_nodes; j++) {
 
-        if ( ( j >= i * 18 + 1  && j< i*18 +1+k ) || ( j>=i*18+1+k+3 && j < (i * 18 + 18 + 1) ) ) {
-          graph[i * num_nodes + j] = 1;
+
+    //let's initialize the first row separately because it doesn't follow the trend
+    for (i=0 ; i < num_nodes; i++) {
+    
+        int index = SERIALIZE(i,j,num_nodes);
+        if (index < 18 ) {
+          graph[index] = 1;
         }
         else {
-          graph[i * num_nodes + j] = 0;
+          graph[index] = 0;
+        }
+      }
+    
+    // we do the rest of the rows that contain "1's"
+    // Since it's a tree, we shift to the right in each row
+    //because the nodes are not connected to only 15 other nodes, 
+      //we skip three columns in each row because after doing a move,
+      //we don't want to do a same-face rotation again
+      // 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+      // 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0
+      // 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0
+      // 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0
+      // 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0
+      //....
+    for (i=1 ; i < num_nodes_at_depth_minus_one; i++) {
+      for (j=0 ; j < num_nodes; j++) {
+
+        int index = SERIALIZE(i,j,num_nodes);
+
+        if (  ( j >= i * 18 + 1          ) &&   j < (i * 18 +      1 + k ) || 
+              ( j >= i * 18 + 1 + k + 3  ) &&   j < (i * 18 + 18 + 1     )   {
+
+          graph[index] = 1;
+        
+        }
+        else {
+          graph[index] = 0;
          }
       }
-	if (i != 0 && i%3==0) k+=3;
+      if (i%3==0) k+=3;
     }
 
     //put zeros in the last level of nodes
