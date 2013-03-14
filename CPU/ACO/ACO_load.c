@@ -23,11 +23,11 @@ int main(int argc, char **argv)
 
     //We define the graph using a matrix of size n*n
     //We load it from the file graph.txt
-    int * G = load_int("data/graph.txt",&n);
+    int * G = load_int("data/graph1.txt",&n);
 
     //We define the level of pheroneme for each edge in a matrix
     //We load it from the file pheroneme.txt
-    float * T = load_float("data/pheroneme.txt",&n);
+    float * T = load_float("data/pheroneme1.txt",&n);
 
     //We define the matrice of the probabilities
     float * P = malloc(sizeof(float)*n*n);
@@ -90,7 +90,7 @@ int main(int argc, char **argv)
                 //Probability to select the next node
                 float Pnext = 0;
 
-                for(j=kth_solution[i]; j<n; j++)
+                for(j=0; j<n; j++)
                 {
                     Pnext += P[n*kth_solution[i-1] + j];
 
