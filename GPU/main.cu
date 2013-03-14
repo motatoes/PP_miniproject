@@ -58,6 +58,7 @@ __global__ void ACO_kernel(int* d_graph, float* d_pheroneme, float* d_probabilit
   //1) generate a solution (haithem)
   //2) update the pheroneme based on the solution(mohamed)
   int tid = threadIdx.x;
+  
 
 }
   
