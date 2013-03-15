@@ -91,7 +91,7 @@ int main(int argc, char **argv)
                 //Probability to select the next node
                 float Pnext = 0;
 
-                for(j=kth_solution[i]; j<GRAPH_SIZE; j++)
+                for(j=0; j<GRAPH_SIZE; j++)
                 {
                     Pnext += P[GRAPH_SIZE*kth_solution[i-1] + j];
 

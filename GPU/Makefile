@@ -20,12 +20,16 @@ CCFILES		:=
 ################################################################################
 # Rules and targets
 
+#CXXFLAGS = -lcurand
+
+
 ROOTDIR = /bham/pd/packages/SL6/x86_64/cuda-4.0.17-sdk/C/common
 BINDIR  = ./bin
-include $(ROOTDIR)/common.mk
+include common.mk
+
 
 # flag to enable double precision
-# NVCCFLAGS += -arch sm_13
+# NVCCFLAGS += -arch sm_13 -lcurand
 
 # flag to save intermediate files to look at PTX code
 # NVCCFLAGS += -keep
