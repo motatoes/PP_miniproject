@@ -8,7 +8,7 @@
 EXECUTABLE	:= smb
 
 # CUDA source files (compiled with nvcc)
-CUFILES		:= main.cu
+CUFILES		:= test.cu
 
 # CUDA dependency files
 CU_DEPS		:= Makefile

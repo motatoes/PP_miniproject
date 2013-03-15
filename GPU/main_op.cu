@@ -63,13 +63,31 @@ int* h_find_best_solution(int* h_solutions, int* h_length, int size);
 //serialized index
 #define SERIALIZE(i,j,row_size) i * row_size + j;
 
+__device__ d_sum_probability(int* d_graph, float* d_pheroneme, int size)
+{
+    float* d_sum;
+    cutilSafeCall(cudaMalloc((void**) &d_probability, sizeof(float)*size));
+
+    for(i=0 ; i<size ; i++)
+    {
+        d_sum[i]=0;
+        for(j=0 ; j<size ; j++)
+        {
+            index = SERIALIZE(i,j,size);
+            if(d_graph[index] != 0 && d_pheroneme[index] != 0){
+                d_sum[i] += pow(d_pheroneme[index],ALPHA) * pow(1/d_graph[index],BETA);
+            }
+        }
+    }
+    return d_sum;
+}
+
 
 __global__ void ACO_kernel(int* d_graph, float* d_pheroneme, float* d_probability, float* d_random_numbers, int* d_solutions,int* d_length)
 {
   //1) generate a solution (haithem)
   //2) update the pheroneme based on the solution(mohamed)
   int tid = threadIdx.x;
-
   int index,j;
   //initialize the array that contain the solution
   //each thread initialise one row
@@ -121,7 +139,6 @@ __global__ void ACO_kernel(int* d_graph, float* d_pheroneme, float* d_probabilit
       j++;
       index=SERIALIZE(tid,j,GRAPH_SIZE);
   }
->>>>>>> 2bc216725c5a528680f093fdec2cb83a0638468d
 
   //Update the pheroneme based on constructed solution
   //Each ant update its own path in the pheroneme matrix
@@ -546,8 +563,5 @@ int* h_find_best_solution(int* h_solutions, int* h_length, int size)
         memcpy(h_best_solution, &(h_solutions[index]), sizeof(int)*GRAPH_SIZE);
       }   
   }
-  return best_solution;
-}
   return h_best_solution;
 }
->>>>>>> 78379af99f2823d9d9c12aa1d1da8aa8f2980fa7
