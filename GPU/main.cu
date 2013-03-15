@@ -121,7 +121,6 @@ __global__ void ACO_kernel(int* d_graph, float* d_pheroneme, float* d_probabilit
       j++;
       index=SERIALIZE(tid,j,GRAPH_SIZE);
   }
->>>>>>> 2bc216725c5a528680f093fdec2cb83a0638468d
 
   //Update the pheroneme based on constructed solution
   //Each ant update its own path in the pheroneme matrix
@@ -550,4 +549,3 @@ int* h_find_best_solution(int* h_solutions, int* h_length, int size)
 }
   return h_best_solution;
 }
->>>>>>> 78379af99f2823d9d9c12aa1d1da8aa8f2980fa7
