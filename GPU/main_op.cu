@@ -58,29 +58,31 @@ float* h_sum_probability(int* h_graph, float* h_pheroneme, int size);
 void h_update_probability(int* h_graph,float* h_pheroneme,float* h_probability, int size, float* h_sum);
 int* h_find_best_solution(int* h_solutions, int* h_length, int size);
 ;
+void h_calculate_path_selections(unsigned int* path_selections, float* probabilities, int nb_ant, int graph_size);
+
 //a macro function that takes as parameters the indexes
 //of a 2d matrix and it's row size, and returns the 
 //serialized index
 #define SERIALIZE(i,j,row_size) i * row_size + j;
 
-__device__ d_sum_probability(int* d_graph, float* d_pheroneme, int size)
-{
-    float* d_sum;
-    cutilSafeCall(cudaMalloc((void**) &d_probability, sizeof(float)*size));
-
-    for(i=0 ; i<size ; i++)
-    {
-        d_sum[i]=0;
-        for(j=0 ; j<size ; j++)
-        {
-            index = SERIALIZE(i,j,size);
-            if(d_graph[index] != 0 && d_pheroneme[index] != 0){
-                d_sum[i] += pow(d_pheroneme[index],ALPHA) * pow(1/d_graph[index],BETA);
-            }
-        }
-    }
-    return d_sum;
-}
+//__device__ d_sum_probability(int* d_graph, float* d_pheroneme, int size)
+//{
+//    float* d_sum;
+//    cutilSafeCall(cudaMalloc((void**) &d_probability, sizeof(float)*size));
+//    int i,j,index;
+//    for(i=0 ; i<size ; i++)
+//    {
+//        d_sum[i]=0;
+//        for(j=0 ; j<size ; j++)
+//        {
+//            index = SERIALIZE(i,j,size);
+//            if(d_graph[index] != 0 && d_pheroneme[index] != 0){
+//                d_sum[i] += pow(d_pheroneme[index],ALPHA) * pow(1/d_graph[index],BETA);
+//            }
+//        }
+//    }
+//    return d_sum;
+//}
 
 
 __global__ void ACO_kernel(int* d_graph, float* d_pheroneme, float* d_probability, float* d_random_numbers, int* d_solutions,int* d_length)
@@ -173,6 +175,8 @@ int main(int argc, char** argv)
   float* h_probability              = (float*)malloc(mem_size_graph_float);
   int*   h_solutions                = (int*)malloc(mem_size_solution);
   int*   h_length                   = (int*)malloc(mem_size_ant);
+  //n path selections precomputed for n ants
+  unsigned int *h_path_selections  =  (unsigned int*)malloc(nb_ant * GRAPH_SIZE * sizeof(unsigned int));
 
   //Initialise random numbers
   float *d_random_numbers;
@@ -201,8 +205,21 @@ int main(int argc, char** argv)
   h_datainit_pheroneme(h_pheroneme, nb_node);
   float* h_sum = h_sum_probability(h_graph, h_pheroneme, nb_node);
   h_update_probability(h_graph, h_pheroneme, h_probability, nb_node, h_sum);
+ 
+  //precalculate n paths for each ant based on the probabilities and send them to the GPU
+  h_calculate_path_selections(h_path_selections, h_probability, nb_ant, GRAPH_SIZE);
 
-
+  printf("The paths that the ants will select are:\n");
+int iteri,iterj;
+for (iteri=0;iteri<nb_ant; iteri++){
+	  for (iterj=0;iterj<GRAPH_SIZE; iterj++) {
+		int index = SERIALIZE(iteri,iterj,GRAPH_SIZE);
+		printf("%d ",  h_path_selections[index] );
+	
+	}
+	printf("\n");
+}
+  printf("\n\n\n\n\n");
 
   // allocate device memory
   int* d_graph;
@@ -548,10 +565,55 @@ void h_update_probability(int* h_graph,float* h_pheroneme,float* h_probability, 
 
 }
 //
+
+
+void h_calculate_path_selections(unsigned int* path_selections, float* probabilities, int nb_ant, int graph_size) {
+
+   int i,j,k,index;
+   float rdm, node_probability, cummulative_probability;
+    srand(time(NULL));
+	
+    //for each ant ...
+    for (i=0; i<nb_ant; i++) {
+	
+	     //givin that it was in node j ...
+	    for  (j=0; j<graph_size; j++) {
+ 
+		    rdm = rand()/RAND_MAX;
+		    
+		    //which node will it chose , probabilistically?
+		    for(k=0; k<graph_size; k++)
+		    {
+				
+			    index = SERIALIZE(j,k,graph_size);
+			    node_probability = probabilities[index];
+		    	    printf("%f\n", rdm); 
+			    //this node (k) is unreachable from node j
+			    if (node_probability == 0) continue;
+			    
+			    cummulative_probability += node_probability;
+
+			    //if the random number is less or equal to
+			    //the probability to select the next node we select it
+			    if( rdm <= cummulative_probability )
+			    {
+				    index = SERIALIZE(i,j,graph_size);
+				    path_selections[index]=k;
+				    break;
+			    }
+		    }
+
+
+	    }
+    } 
+
+}
+
+
 int* h_find_best_solution(int* h_solutions, int* h_length, int size)
 {
-  //find the shortest length and path
-  int* h_best_solution = (int*)malloc(sizeof(int) * GRAPH_SIZE);
+	//find the shortest length and path
+	int* h_best_solution = (int*)malloc(sizeof(int) * GRAPH_SIZE);
   int Lmin=h_length[0];
   int index;
   for(int i=1; i<size; i++)
