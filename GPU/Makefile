@@ -8,7 +8,7 @@
 EXECUTABLE	:= smb
 
 # CUDA source files (compiled with nvcc)
-CUFILES		:= test.cu
+CUFILES		:= main.cu
 
 # CUDA dependency files
 CU_DEPS		:= Makefile
@@ -19,8 +19,6 @@ CCFILES		:=
 
 ################################################################################
 # Rules and targets
-
-#CXXFLAGS = -lcurand
 
 
 ROOTDIR = /bham/pd/packages/SL6/x86_64/cuda-4.0.17-sdk/C/common

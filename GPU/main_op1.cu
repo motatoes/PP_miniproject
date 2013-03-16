@@ -15,27 +15,28 @@
 
 /*ACO parameters*/
   //Number of nodes in the graph
-  #define GRAPH_SIZE 10
+  #define GRAPH_SIZE 1024
   //Number of iteration in ACO algorithm
-  #define ACO_ITER_MAX 5
+  #define ACO_ITER_MAX 2
   //evaporation rate
   #define EVAP_RATE 0.3
   //influence rate of the pheroneme
-  #define ALPHA 0.8
+  #define ALPHA 0.2
   //influence rate of the heuristic (distance)
-  #define BETA 0.2
+  #define BETA 0.8
   //Initial level of pheroneme
   #define INIT_PHERONEME 5
   //Update pheroneme constant
   #define UPDT_PHERONEME_CONST 2
   //Number of moves allowed through the graph
   #define NSTEPS 2
-  //Number of ants is going to be the number of thread in total
+  //Number of ants
+  #define NB_ANT 1024
 /*End ACO parameters*/
 
 /*GPU parameters*/
-  #define BLOCK_SIZE 32
   #define GRID_SIZE 1
+  #define BLOCK_SIZE 1024
   #define ITER_BENCHMARK 100
 /*End GPU parameters*/
 
@@ -53,9 +54,8 @@
 //function prototypes
 void h_datainit_graph(int*, int);
 void h_datainit_pheroneme(float*, int);
-void h_update_pheroneme(float* h_pheroneme, int size);
 float* h_sum_probability(int* h_graph, float* h_pheroneme, int size);
-void h_update_probability(int* h_graph,float* h_pheroneme,float* h_probability, int size, float* h_sum);
+void h_init_probability(int* h_graph,float* h_pheroneme,float* h_probability, int size, float* h_sum);
 int* h_find_best_solution(int* h_solutions, int* h_length, int size);
 ;
 //a macro function that takes as parameters the indexes
@@ -78,7 +78,12 @@ __global__ void ACO_kernel(int* d_graph, float* d_pheroneme, float* d_probabilit
     d_solutions[index]=0;
   }
 
-  //Generate the solution
+  
+  __syncthreads();
+  
+
+
+  // //Generate the solution
   float rdm;
   index=SERIALIZE(tid,1,GRAPH_SIZE);
   //For the cube it is going to be loop until NB_STEP is reached or solution found 
@@ -91,10 +96,11 @@ __global__ void ACO_kernel(int* d_graph, float* d_pheroneme, float* d_probabilit
       //Probability to select the next node
       float Pnext = 0;
 
-      int j;
+      int j,ip;
       for(j=0; j<GRAPH_SIZE; j++)
       {
-          Pnext += d_probability[GRAPH_SIZE*d_solutions[index-1] + j];
+          ip = SERIALIZE(d_solutions[index-1], j, GRAPH_SIZE);
+          Pnext += d_probability[ip];
 
           //if the random number is less or equal to
           //the probability to select the next node we select it
@@ -133,7 +139,7 @@ __global__ void ACO_kernel(int* d_graph, float* d_pheroneme, float* d_probabilit
 
 }
 
-__global__ update_data(float* d_pheroneme, float* d_probability)
+__global__ void update_pheroneme_kernel(float* d_pheroneme)
 {
   int tid = threadIdx.x;
   int index;
@@ -141,31 +147,85 @@ __global__ update_data(float* d_pheroneme, float* d_probability)
   for(int j=0; j<GRAPH_SIZE; j++)
   {
     index=SERIALIZE(tid,j,GRAPH_SIZE);
-    
+    d_pheroneme[index] = (1-EVAP_RATE) * d_pheroneme[index];
   }
 }
 
 
-__device__ d_sum_probability(int* d_graph, float* d_pheroneme, int size)
+__global__ void update_probability_kernel1(int* d_graph, float* d_pheroneme, float* d_probability)
 {
-    float* d_sum;
-    cutilSafeCall(cudaMalloc((void**) &d_probability, sizeof(float)*size));
-    int i;
-    for(i=0 ; i<size ; i++)
-    {
-        d_sum[i]=0;
-        for(j=0 ; j<size ; j++)
+  int tid = threadIdx.x;
+  int index;
+
+  //update probability based on the new pheroneme matrix
+  for(int j=0; j<GRAPH_SIZE; j++)
+  {
+      index = SERIALIZE(tid,j,GRAPH_SIZE);
+      if(d_graph[index] != 0)
         {
-            index = SERIALIZE(i,j,size);
-            if(d_graph[index] != 0 && d_pheroneme[index] != 0){
-                d_sum[i] += pow(d_pheroneme[index],ALPHA) * pow(1/d_graph[index],BETA);
-            }
+           d_probability[index] = pow((double)d_pheroneme[index],ALPHA) * pow( 1/(double)d_graph[index], BETA );
         }
-    }
-    return d_sum;
+  }
+
 }
 
-  
+__device__ float d_f(float x, float y) { return x + y; }
+
+__global__ void sum_probablity_kernel(float* d_probability, float* d_sum)
+{
+  int tid = threadIdx.x;
+
+  //Use the reduce algorithm we did on the lab to calculate the sum of probability
+  //Each thread will reduce each row of the probability matrix
+  float tmp1,tmp2;
+  int nsteps;
+  int fi,si;
+  int index;
+  for(int j=0; j<GRAPH_SIZE; j++)
+  {
+
+    index=SERIALIZE(j, tid, GRAPH_SIZE);
+
+    fi = SERIALIZE(j, tid * 2, GRAPH_SIZE);
+    si = SERIALIZE(j, tid * 2 + 1, GRAPH_SIZE);
+    
+    d_sum[index] = d_f(d_probability[fi] , d_probability[si]);
+    __syncthreads();
+
+    nsteps = log2((float)GRAPH_SIZE);
+
+     #pragma unroll
+     for (int k=1; k < nsteps; k++) {
+        
+     //first read all elements, then write
+     //this is to avoid race condition ...
+     //if one thread writes before another, the result will be wrong
+          tmp1 =  d_sum[fi];
+          tmp2 =  d_sum[si];
+          __syncthreads();
+          d_sum[index] = d_f(tmp1, tmp2);
+    
+    __syncthreads();    
+    }
+  }
+}
+
+
+__global__ void update_probability_kernel2(float* d_probability,float* d_sum)
+{
+  int tid = threadIdx.x;
+  int index;
+
+  //update probability based on the new pheroneme matrix
+  int index_sum;
+  for(int j=0; j<GRAPH_SIZE; j++)
+  {
+      index = SERIALIZE(tid,j,GRAPH_SIZE);
+      index_sum = SERIALIZE(tid,0,GRAPH_SIZE);
+      d_probability[index] /= d_sum[index_sum];
+  }
+
+}
 
 /*
  * Main program and benchmarking 
@@ -177,11 +237,10 @@ int main(int argc, char** argv)
   // allocate host memory 
   unsigned int nb_node              = GRAPH_SIZE; 
   unsigned int size_graph           = GRAPH_SIZE*GRAPH_SIZE;
-  unsigned int nb_ant               = BLOCK_SIZE*GRID_SIZE;  
   unsigned int mem_size_graph_int   = sizeof(int) * size_graph;
   unsigned int mem_size_graph_float = sizeof(float) * size_graph;
-  unsigned int mem_size_ant         = sizeof(int) * nb_ant;
-  unsigned int mem_size_solution    = sizeof(int)*nb_ant*GRAPH_SIZE;    
+  unsigned int mem_size_ant         = sizeof(int) * NB_ANT;
+  unsigned int mem_size_solution    = sizeof(int)*NB_ANT*GRAPH_SIZE;    
   int*   h_graph                    = (int*)malloc(mem_size_graph_int); 
   float* h_pheroneme                = (float*)malloc(mem_size_graph_float);
   float* h_probability              = (float*)malloc(mem_size_graph_float);
@@ -193,29 +252,26 @@ int main(int argc, char** argv)
   //create curand generator object
   curandGenerator_t gen;
   /* Allocate n floats on device */
-  CUDA_CALL(cudaMalloc((void **)&d_random_numbers, nb_ant * nb_node *sizeof(float)));
+  CUDA_CALL(cudaMalloc((void **)&d_random_numbers, NB_ANT * nb_node *sizeof(float)));
 
   /* Create pseudo-random number generator */
   CURAND_CALL(curandCreateGenerator(&gen, 
-                CURAND_RNG_PSEUDO_DEFAULT));
+              CURAND_RNG_PSEUDO_DEFAULT));
   /* Set seed */
   CURAND_CALL(curandSetPseudoRandomGeneratorSeed(gen, 
-                1234ULL));
+              time(NULL)));
   /* Generate n floats on device */
-  CURAND_CALL(curandGenerateUniform(gen, d_random_numbers, nb_ant * nb_node ));
+  CURAND_CALL(curandGenerateUniform(gen, d_random_numbers, NB_ANT * nb_node ));
 
 
 
   printf("Input size : %d\n", GRAPH_SIZE);
-  printf("Grid size  : %d\n", GRID_SIZE);
-  printf("Block size : %d\n", BLOCK_SIZE);
 
   //Initialise the graph, the pheroneme and the probabilities
   h_datainit_graph(h_graph, nb_node);
   h_datainit_pheroneme(h_pheroneme, nb_node);
   float* h_sum = h_sum_probability(h_graph, h_pheroneme, nb_node);
-  h_update_probability(h_graph, h_pheroneme, h_probability, nb_node, h_sum);
-
+  h_init_probability(h_graph, h_pheroneme, h_probability, nb_node, h_sum);
 
 
   // allocate device memory
@@ -230,7 +286,11 @@ int main(int argc, char** argv)
 
   //Array that contain the length of the path generated by each ant
   int* d_length;
-  cutilSafeCall(cudaMalloc((void**) &d_length, mem_size_ant));  
+  cutilSafeCall(cudaMalloc((void**) &d_length, mem_size_ant));
+
+  //Array that contain the sum of the probability
+  float* d_sum;
+  cutilSafeCall(cudaMalloc((void**) &d_sum, mem_size_graph_float));  
   
 
   // copy host memory to device
@@ -256,28 +316,32 @@ int* h_best_solution;
   for (int j = 0; j < ITER_BENCHMARK; j++) 
       for(int i = 0; i < ACO_ITER_MAX; i++){
 
-        ACO_kernel<<<GRID_SIZE, BLOCK_SIZE >>>(d_graph, d_pheroneme, d_probability, d_random_numbers, d_solutions, d_length);
-          // copy result from device to host
-          cutilSafeCall(cudaMemcpy(h_solutions, d_solutions, 
-               mem_size_solution, cudaMemcpyDeviceToHost));
-          cutilSafeCall(cudaMemcpy(h_length, d_length, 
-               mem_size_ant, cudaMemcpyDeviceToHost));
-          cutilSafeCall(cudaMemcpy(h_pheroneme, d_pheroneme, 
-               mem_size_graph_float, cudaMemcpyDeviceToHost));
-          //find the best solution and its length
-          h_best_solution = h_find_best_solution(h_solutions,h_length,nb_ant);
-          //update the pheroneme (evaporation)
-          h_update_pheroneme(h_pheroneme,nb_node);
-          //update the probability
-          h_sum = h_sum_probability(h_graph, h_pheroneme, nb_node);
-          h_update_probability(h_graph, h_pheroneme, h_probability, nb_node, h_sum);
-          //copy back the update pheroneme and probability to the GPU
-          cutilSafeCall(cudaMemcpy(d_pheroneme, h_pheroneme, 
-              mem_size_graph_float, cudaMemcpyHostToDevice));
+        ACO_kernel<<<1, NB_ANT >>>(d_graph, d_pheroneme, d_probability, d_random_numbers, d_solutions, d_length);
+        update_pheroneme_kernel<<<GRID_SIZE,BLOCK_SIZE>>>(d_pheroneme);
+        update_probability_kernel1<<<GRID_SIZE,BLOCK_SIZE>>>(d_graph, d_pheroneme, d_probability);
+        sum_probablity_kernel<<<GRID_SIZE,BLOCK_SIZE/2>>>(d_probability,d_sum);
+        update_probability_kernel2<<<GRID_SIZE,BLOCK_SIZE-1>>>(d_probability,d_sum);
 
-          cutilSafeCall(cudaMemcpy(d_probability, h_probability, 
-              mem_size_graph_float, cudaMemcpyHostToDevice));
-      }
+        // copy result from device to host
+        cutilSafeCall(cudaMemcpy(h_solutions, d_solutions, 
+            mem_size_solution, cudaMemcpyDeviceToHost));
+
+        cutilSafeCall(cudaMemcpy(h_length, d_length, 
+           mem_size_ant, cudaMemcpyDeviceToHost));
+
+        //find the best solution and its length
+        h_best_solution = h_find_best_solution(h_solutions,h_length,NB_ANT);
+
+
+
+        //regenerate random numbers
+        /* Set seed */
+        CURAND_CALL(curandSetPseudoRandomGeneratorSeed(gen, 
+                    time(NULL)));
+        /* Generate n floats on device */
+        CURAND_CALL(curandGenerateUniform(gen, d_random_numbers, NB_ANT * nb_node ));
+     }
+
 
   printf("the best path is: \n");
   int i = 1;
@@ -287,25 +351,28 @@ int* h_best_solution;
     printf("%d ",h_best_solution[i]);
     i++;
   }
-  printf("\n");
-  printf("last set of solutions \n");
-  int index;
-  for(int i=0; i<nb_ant; i++)
-  {
-    for(int j=0; j<nb_node; j++)
-    {
-        index = SERIALIZE(i,j,nb_node);
-        printf("%d ",h_solutions[index]);
-    }
-     printf("\n");
-  }
+   printf("\n");
 
-  printf("last set of length solution \n");
-  for(int i=0; i<nb_ant; i++)
-  {
-    printf("%d ",h_length[i]);
-  }
-  printf("\n");
+
+  // printf("last set of solutions \n");
+  // int index;
+  // for(int i=0; i<NB_ANT; i++)
+  // {
+  //   for(int j=0; j<nb_node; j++)
+  //   {
+  //       index = SERIALIZE(i,j,nb_node);
+  //       printf("%d ",h_solutions[index]);
+  //   }
+  //    printf("\n");
+  // }
+
+  // printf("last set of length solution \n");
+  // for(int i=0; i<NB_ANT; i++)
+  // {
+  //   printf("%d ",h_length[i]);
+  // }
+  
+  //  printf("\n");
 
   // check if kernel execution generated and error
   cutilCheckMsg("Kernel execution failed");
@@ -316,7 +383,7 @@ int* h_best_solution;
   // stop and destroy timer
   cutilCheckError(cutStopTimer(timer));
   double dSeconds = cutGetTimerValue(timer)/(1000.0);
-  double dNumOps = ITER_BENCHMARK * (size_graph * 3 + nb_ant * GRAPH_SIZE + nb_ant);
+  double dNumOps = ITER_BENCHMARK * (size_graph * 4 + NB_ANT * (2*GRAPH_SIZE + 1));
   double gflops = dNumOps/dSeconds/1.0e9;
 
   //Log througput
@@ -336,6 +403,7 @@ int* h_best_solution;
   cutilSafeCall(cudaFree(d_probability));
   cutilSafeCall(cudaFree(d_solutions));
   cutilSafeCall(cudaFree(d_length));
+  cutilSafeCall(cudaFree(d_sum));
 
   CURAND_CALL(curandDestroyGenerator(gen));
   CUDA_CALL(cudaFree(d_random_numbers)); 
@@ -377,9 +445,12 @@ void h_datainit_pheroneme(float* h_pheroneme, int size)
         {
             index = SERIALIZE(i,j,size);
             if(i < j)
-                h_pheroneme[index] = INIT_PHERONEME;
+            {
+              h_pheroneme[index] = INIT_PHERONEME;
+            }
             else{
-            h_pheroneme[index] = 0;}
+            h_pheroneme[index] = 0;
+          }
         }
     }
 
@@ -501,26 +572,6 @@ void datainit_graph_cube(int *graph,int max_depth) {
 }
 */
 
-
-
-void h_update_pheroneme(float* h_pheroneme, int size)
-{
-    int i,j,index;
-    //evaporation
-    for(i=0 ; i<size ; i++)
-    {
-        for(j=0 ; j<size ; j++)
-        {
-            index = SERIALIZE(i,j,size);
-            if(h_pheroneme[index] != 0)
-            {
-                h_pheroneme[index] = (1-EVAP_RATE) * h_pheroneme[index];
-            }
-        }
-    }
-}
-
-
 float* h_sum_probability(int* h_graph, float* h_pheroneme, int size)
 
 {
@@ -532,7 +583,7 @@ float* h_sum_probability(int* h_graph, float* h_pheroneme, int size)
         for(j=0 ; j<size ; j++)
         {
             index = SERIALIZE(i,j,size);
-            if(h_graph[index] != 0 && h_pheroneme[index] != 0){
+            if(h_graph[index] != 0){
                 sum[i] += pow(h_pheroneme[index],ALPHA) * pow(1/h_graph[index],BETA);
             }
         }
@@ -541,7 +592,7 @@ float* h_sum_probability(int* h_graph, float* h_pheroneme, int size)
 }
 
 
-void h_update_probability(int* h_graph,float* h_pheroneme,float* h_probability, int size, float* h_sum)
+void h_init_probability(int* h_graph,float* h_pheroneme,float* h_probability, int size, float* h_sum)
 {
     //same methode as the CPU version
     int i,j,index;
@@ -550,7 +601,7 @@ void h_update_probability(int* h_graph,float* h_pheroneme,float* h_probability, 
         for(j=0 ; j<size ; j++)
         {
             index = SERIALIZE(i,j,size);
-            if(h_graph[index] != 0 && h_pheroneme[index] != 0)
+            if(h_graph[index] != 0)
             {
                 h_probability[index] = pow(h_pheroneme[index],ALPHA) * pow(1/h_graph[index],BETA)/h_sum[i];
             }

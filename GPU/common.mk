@@ -86,9 +86,9 @@ CWARN_FLAGS := $(CXXWARN_FLAGS) \
 	-Wmain \
 
 # architecture flag for nvcc and gcc compilers build
-CUBIN_ARCH_FLAG := 
-CXX_ARCH_FLAGS  := -lcurand
-NVCCFLAGS       := 
+CUBIN_ARCH_FLAG := -lm
+CXX_ARCH_FLAGS  := -lm -lcurand
+NVCCFLAGS       := -lm 
 LIB_ARCH        := $(OSARCH)
 
 # Determining the necessary Cross-Compilation Flags
