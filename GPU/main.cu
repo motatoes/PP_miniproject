@@ -69,6 +69,7 @@ __global__ void ACO_kernel(int* d_graph, float* d_pheroneme, float* d_probabilit
   //1) generate a solution (haithem)
   //2) update the pheroneme based on the solution(mohamed)
   int tid = threadIdx.x;
+
   int index,j;
   //initialize the array that contain the solution
   //each thread initialise one row
@@ -544,5 +545,7 @@ int* h_find_best_solution(int* h_solutions, int* h_length, int size)
         memcpy(h_best_solution, &(h_solutions[index]), sizeof(int)*GRAPH_SIZE);
       }   
   }
+  return best_solution;
+}
   return h_best_solution;
 }
