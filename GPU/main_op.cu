@@ -63,25 +63,6 @@ int* h_find_best_solution(int* h_solutions, int* h_length, int size);
 //serialized index
 #define SERIALIZE(i,j,row_size) i * row_size + j;
 
-__device__ d_sum_probability(int* d_graph, float* d_pheroneme, int size)
-{
-    float* d_sum;
-    cutilSafeCall(cudaMalloc((void**) &d_probability, sizeof(float)*size));
-
-    for(i=0 ; i<size ; i++)
-    {
-        d_sum[i]=0;
-        for(j=0 ; j<size ; j++)
-        {
-            index = SERIALIZE(i,j,size);
-            if(d_graph[index] != 0 && d_pheroneme[index] != 0){
-                d_sum[i] += pow(d_pheroneme[index],ALPHA) * pow(1/d_graph[index],BETA);
-            }
-        }
-    }
-    return d_sum;
-}
-
 
 __global__ void ACO_kernel(int* d_graph, float* d_pheroneme, float* d_probability, float* d_random_numbers, int* d_solutions,int* d_length)
 {
@@ -151,6 +132,39 @@ __global__ void ACO_kernel(int* d_graph, float* d_pheroneme, float* d_probabilit
     }
 
 }
+
+__global__ update_data(float* d_pheroneme, float* d_probability)
+{
+  int tid = threadIdx.x;
+  int index;
+  //pheroneme evaporation
+  for(int j=0; j<GRAPH_SIZE; j++)
+  {
+    index=SERIALIZE(tid,j,GRAPH_SIZE);
+    
+  }
+}
+
+
+__device__ d_sum_probability(int* d_graph, float* d_pheroneme, int size)
+{
+    float* d_sum;
+    cutilSafeCall(cudaMalloc((void**) &d_probability, sizeof(float)*size));
+    int i;
+    for(i=0 ; i<size ; i++)
+    {
+        d_sum[i]=0;
+        for(j=0 ; j<size ; j++)
+        {
+            index = SERIALIZE(i,j,size);
+            if(d_graph[index] != 0 && d_pheroneme[index] != 0){
+                d_sum[i] += pow(d_pheroneme[index],ALPHA) * pow(1/d_graph[index],BETA);
+            }
+        }
+    }
+    return d_sum;
+}
+
   
 
 /*
