@@ -85,7 +85,7 @@ int main(int argc, char **argv)
                 printf("kth_sol[i-1]: %d \n",kth_solution[i-1]);
                 //select the next node based on the probability
                 //generate a random number between 0 and 1 with 0 excluded
-                rdm = (rand())/(float)RAND_MAX);
+                rdm = (rand()/(float)RAND_MAX);
                 printf("random number : %f \n",rdm);
 
                 //Probability to select the next node
