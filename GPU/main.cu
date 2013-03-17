@@ -21,9 +21,9 @@
   //evaporation rate
   #define EVAP_RATE 0.3
   //influence rate of the pheroneme
-  #define ALPHA 0.2
+  #define ALPHA 0.8
   //influence rate of the heuristic (distance)
-  #define BETA 0.8
+  #define BETA 0.2
   //Initial level of pheroneme
   #define INIT_PHERONEME 5
   //Update pheroneme constant
@@ -294,6 +294,7 @@ int* h_best_solution;
 
   //Log througput
   printf("Throughput = %.4f GFlop/s\n", gflops);
+  printf("Times = %.4f s\n", dSeconds);
   cutilCheckError(cutDeleteTimer(timer));
 
   // clean up memory

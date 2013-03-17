@@ -3,6 +3,7 @@
 #include <math.h>
 #include <time.h>
 #include <string.h>
+#include <limits.h>
 
 
 //libs
@@ -51,7 +52,7 @@ int main(int argc, char **argv)
     int iter = 0;
 
     //Minimum length
-    int Lmin;
+    int Lmin = INT_MAX;
 
     //Shortest path
     int * best_path = malloc(sizeof(int)*GRAPH_SIZE);
@@ -121,7 +122,6 @@ int main(int argc, char **argv)
             }
 
             //find the shortest length and path
-            Lmin=L[0];
             if(L[k]<=Lmin)
             {
                 Lmin = L[k];

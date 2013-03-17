@@ -17,7 +17,7 @@
   //Number of nodes in the graph
   #define GRAPH_SIZE 1024
   //Number of iteration in ACO algorithm
-  #define ACO_ITER_MAX 10
+  #define ACO_ITER_MAX 2
   //evaporation rate
   #define EVAP_RATE 0.3
   //influence rate of the pheroneme
