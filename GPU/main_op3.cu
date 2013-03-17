@@ -17,13 +17,13 @@
   //Number of nodes in the graph
   #define GRAPH_SIZE 1024
   //Number of iteration in ACO algorithm
-  #define ACO_ITER_MAX 2
+  #define ACO_ITER_MAX 10
   //evaporation rate
   #define EVAP_RATE 0.3
   //influence rate of the pheroneme
-  #define ALPHA 0.2
+  #define ALPHA 0.8
   //influence rate of the heuristic (distance)
-  #define BETA 0.8
+  #define BETA 0.2
   //Initial level of pheroneme
   #define INIT_PHERONEME 5
   //Update pheroneme constant
@@ -83,6 +83,7 @@ __global__ void generate_solutions(float* d_probability,float* d_random_numbers,
 
   int tid = threadIdx.x;
   int index;
+  
   // //Generate the solution
   float rdm;
   
@@ -116,10 +117,9 @@ __global__ void generate_solutions(float* d_probability,float* d_random_numbers,
   }
 }
 
-__global__ void ACO_kernel(int* d_graph, float* d_pheroneme, float* d_probability, float* d_random_numbers, int* d_solutions,int* d_length)
+__global__ void update_pheroneme_kernel1(int* d_graph, float* d_pheroneme, float* d_probability, float* d_random_numbers, int* d_solutions,int* d_length)
 {
-  //1) generate a solution (haithem)
-  //2) update the pheroneme based on the solution(mohamed)
+
   int tid = threadIdx.x;
   int index,j;
   
@@ -147,7 +147,7 @@ __global__ void ACO_kernel(int* d_graph, float* d_pheroneme, float* d_probabilit
 
 }
 
-__global__ void update_pheroneme_kernel(float* d_pheroneme)
+__global__ void update_pheroneme_kernel2(float* d_pheroneme)
 {
   int tid = threadIdx.x;
   int index;
@@ -235,6 +235,54 @@ __global__ void update_probability_kernel2(float* d_probability,float* d_sum)
 
 }
 
+__global__ void d_find_best_solution(int* d_solutions, int* d_length, int* d_best_solution)
+{
+  //find the shortest length and path
+  int tid = threadIdx.x;
+
+  //initialize indices
+  d_length[tid] = tid;
+
+  int fi = tid * 2;
+  int si = tid * 2 + 1;
+
+  int nsteps = log2((float)GRAPH_SIZE);
+  int tmp1,tmp2;
+
+  __shared__ int indices[GRAPH_SIZE]; 
+
+  #pragma unroll
+  for (int k=0; k < nsteps; k++) {
+      
+  //first read all elements, then write
+  //this is to avoid race condition ...
+  //if one thread writes before another, the result will be wrong
+        tmp1 =  d_length[fi];
+        tmp2 =  d_length[si];
+        __syncthreads();
+        d_length[tid] = fminf(tmp1, tmp2);
+        if(d_length[tid]==tmp1)
+        {
+          indices[tid]  = fi;
+        }
+        else{
+          indices[tid]  = si;
+        }
+        
+
+
+  __syncthreads();    
+  }
+
+  //Copy the best solution (each thread copy two elements)
+  int first_index  = SERIALIZE(indices[0],fi,GRAPH_SIZE);
+  int second_index = SERIALIZE(indices[0],si,GRAPH_SIZE);
+  d_best_solution[2*tid]   = d_solutions[first_index];
+  d_best_solution[2*tid+1] = d_solutions[second_index];
+
+}
+
+
 /*
  * Main program and benchmarking 
  */
@@ -254,6 +302,7 @@ int main(int argc, char** argv)
   float* h_probability              = (float*)malloc(mem_size_graph_float);
   int*   h_solutions                = (int*)malloc(mem_size_solution);
   int*   h_length                   = (int*)malloc(mem_size_ant);
+  int*   h_best_solution            = (int*)malloc(sizeof(int)*GRAPH_SIZE);
 
   //Initialise random numbers
   float *d_random_numbers;
@@ -298,7 +347,11 @@ int main(int argc, char** argv)
 
   //Array that contain the sum of the probability
   float* d_sum;
-  cutilSafeCall(cudaMalloc((void**) &d_sum, mem_size_graph_float));  
+  cutilSafeCall(cudaMalloc((void**) &d_sum, mem_size_graph_float));
+
+  int* d_best_solution;
+  cutilSafeCall(cudaMalloc((void**) &d_best_solution, sizeof(int)*GRAPH_SIZE));
+
   
 
   // copy host memory to device
@@ -319,28 +372,29 @@ int main(int argc, char** argv)
   cutilCheckError(cutCreateTimer(&timer));
   cutilCheckError(cutStartTimer(timer));  
 
-int* h_best_solution;
+
 // execute kernel
   for (int j = 0; j < ITER_BENCHMARK; j++) 
       for(int i = 0; i < ACO_ITER_MAX; i++){
 
-        init_d_solutions<<<1, NB_ANT >>>( d_solutions);
+        init_d_solutions<<<1, NB_ANT >>>(d_solutions);
         generate_solutions<<<1, NB_ANT>>>(d_probability,d_random_numbers,d_solutions);
-        ACO_kernel<<<1, NB_ANT >>>(d_graph, d_pheroneme, d_probability, d_random_numbers, d_solutions, d_length);
-        update_pheroneme_kernel<<<GRID_SIZE,BLOCK_SIZE>>>(d_pheroneme);
+        update_pheroneme_kernel1<<<1, NB_ANT >>>(d_graph, d_pheroneme, d_probability, d_random_numbers, d_solutions, d_length);
+        update_pheroneme_kernel2<<<GRID_SIZE,BLOCK_SIZE>>>(d_pheroneme);
         update_probability_kernel1<<<GRID_SIZE,BLOCK_SIZE>>>(d_graph, d_pheroneme, d_probability);
         sum_probablity_kernel<<<GRID_SIZE,BLOCK_SIZE/2>>>(d_probability,d_sum);
         update_probability_kernel2<<<GRID_SIZE,BLOCK_SIZE-1>>>(d_probability,d_sum);
+        d_find_best_solution<<<GRID_SIZE,BLOCK_SIZE/2>>>(d_solutions, d_length, d_best_solution);
 
-        // copy result from device to host
-        cutilSafeCall(cudaMemcpy(h_solutions, d_solutions, 
-            mem_size_solution, cudaMemcpyDeviceToHost));
+        // // copy result from device to host
+        // cutilSafeCall(cudaMemcpy(h_solutions, d_solutions, 
+        //     mem_size_solution, cudaMemcpyDeviceToHost));
 
-        cutilSafeCall(cudaMemcpy(h_length, d_length, 
-           mem_size_ant, cudaMemcpyDeviceToHost));
+        // cutilSafeCall(cudaMemcpy(h_length, d_length, 
+        //    mem_size_ant, cudaMemcpyDeviceToHost));
 
         //find the best solution and its length
-        h_best_solution = h_find_best_solution(h_solutions,h_length,NB_ANT);
+
 
 
 
@@ -352,6 +406,9 @@ int* h_best_solution;
         CURAND_CALL(curandGenerateUniform(gen, d_random_numbers, NB_ANT * nb_node ));
      }
 
+
+  cutilSafeCall(cudaMemcpy(h_best_solution, d_best_solution, 
+            sizeof(int)*GRAPH_SIZE, cudaMemcpyDeviceToHost));
 
   printf("the best path is: \n");
   int i = 1;
@@ -398,6 +455,7 @@ int* h_best_solution;
 
   //Log througput
   printf("Throughput = %.4f GFlop/s\n", gflops);
+  printf("Times = %.4f s\n", dSeconds);
   cutilCheckError(cutDeleteTimer(timer));
 
   // clean up memory
@@ -414,6 +472,7 @@ int* h_best_solution;
   cutilSafeCall(cudaFree(d_solutions));
   cutilSafeCall(cudaFree(d_length));
   cutilSafeCall(cudaFree(d_sum));
+  cutilSafeCall(cudaFree(d_best_solution));
 
   CURAND_CALL(curandDestroyGenerator(gen));
   CUDA_CALL(cudaFree(d_random_numbers)); 

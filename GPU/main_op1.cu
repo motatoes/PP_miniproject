@@ -66,8 +66,6 @@ int* h_find_best_solution(int* h_solutions, int* h_length, int size);
 
 __global__ void ACO_kernel(int* d_graph, float* d_pheroneme, float* d_probability, float* d_random_numbers, int* d_solutions,int* d_length)
 {
-  //1) generate a solution (haithem)
-  //2) update the pheroneme based on the solution(mohamed)
   int tid = threadIdx.x;
   int index,j;
   //initialize the array that contain the solution

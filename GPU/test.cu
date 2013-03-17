@@ -54,3 +54,47 @@ int main(int argc, char *argv[])
     free(hostData);    
     return EXIT_SUCCESS;
 }
+
+
+
+void h_calculate_path_selections(unsigned int* path_selections, float* probabilities, int nb_ant, int graph_size) {
+
+   int i,j,k,index;
+   float rdm, node_probability, cummulative_probability;
+    srand(time(NULL));
+    
+    //for each ant ...
+    for (i=0; i<nb_ant; i++) {
+    
+         //givin that it was in node j ...
+        for  (j=0; j<graph_size; j++) {
+ 
+            rdm = rand()/(float)RAND_MAX;
+            cummulative_probability = 0; 
+            //which node will it chose , probabilistically?
+            for(k=0; k<graph_size; k++)
+            {
+                
+                index = SERIALIZE(j,k,graph_size);
+                node_probability = probabilities[index];
+                //this node (k) is unreachable from node j
+                if (node_probability == 0) continue;
+                
+                printf("%f\n", rdm );
+                cummulative_probability += node_probability;
+
+                //if the random number is less or equal to
+                //the probability to select the next node we select it
+                if( rdm <= cummulative_probability )
+                {
+                    index = SERIALIZE(i,j,graph_size);
+                    path_selections[index]=k;
+                    break;
+                }
+            }
+
+
+        }
+    } 
+
+}
