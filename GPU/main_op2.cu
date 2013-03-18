@@ -20,16 +20,14 @@
   #define ACO_ITER_MAX 2
   //evaporation rate
   #define EVAP_RATE 0.3
-  //influence rate of the pheroneme
-  #define ALPHA 0.2
+  //influence rate of the pheromone
+  #define ALPHA 0.8
   //influence rate of the heuristic (distance)
-  #define BETA 0.8
-  //Initial level of pheroneme
-  #define INIT_PHERONEME 5
-  //Update pheroneme constant
-  #define UPDT_PHERONEME_CONST 2
-  //Number of moves allowed through the graph
-  #define NSTEPS 2
+  #define BETA 0.2
+  //Initial level of pheromone
+  #define INIT_PHEROMONE 5
+  //Update pheromone constant
+  #define UPDT_PHEROMONE_CONST 2
   //Number of ants
   #define NB_ANT 1024
 /*End ACO parameters*/
@@ -42,24 +40,24 @@
 
 //random numbers macros
 #define CUDA_CALL(x) do { if((x)!=cudaSuccess) { \
-    printf("Error at %s:%d\n",__FILE__,__LINE__);\
-    return EXIT_FAILURE;}} while(0)
+printf("Error at %s:%d\n",__FILE__,__LINE__);\
+return EXIT_FAILURE;}} while(0)
 #define CURAND_CALL(x) do { if((x)!=CURAND_STATUS_SUCCESS) { \
-    printf("Error at %s:%d\n",__FILE__,__LINE__);\
-    return EXIT_FAILURE;}} while(0)
+printf("Error at %s:%d\n",__FILE__,__LINE__);\
+return EXIT_FAILURE;}} while(0)
 
 
 
 
 //function prototypes
 void h_datainit_graph(int*, int);
-void h_datainit_pheroneme(float*, int);
-float* h_sum_probability(int* h_graph, float* h_pheroneme, int size);
-void h_init_probability(int* h_graph,float* h_pheroneme,float* h_probability, int size, float* h_sum);
+void h_datainit_pheromone(float*, int);
+float* h_sum_probability(int* h_graph, float* h_pheromone, int size);
+void h_init_probability(int* h_graph,float* h_pheromone,float* h_probability, int size, float* h_sum);
 int* h_find_best_solution(int* h_solutions, int* h_length, int size);
 
 //a macro function that takes as parameters the indexes
-//of a 2d matrix and it's row size, and returns the 
+//of a 2d matrix and it's row size, and returns the
 //serialized index
 #define SERIALIZE(i,j,row_size) i * row_size + j;
 
@@ -88,7 +86,7 @@ __global__ void generate_solutions(float* d_probability,float* d_random_numbers,
   float rdm;
   
   index=SERIALIZE(tid,1,GRAPH_SIZE);
-  //For the cube it is going to be loop until NB_STEP is reached or solution found 
+  //For the cube it is going to be loop until NB_STEP is reached or solution found
   while(d_solutions[index-1] != GRAPH_SIZE-1)
   {
       //select the next node based on the probability
@@ -117,7 +115,7 @@ __global__ void generate_solutions(float* d_probability,float* d_random_numbers,
   }
 }
 
-__global__ void ACO_kernel(int* d_graph, float* d_pheroneme, float* d_probability, float* d_random_numbers, int* d_solutions,int* d_length)
+__global__ void update_pheromone_kernel1(int* d_graph, float* d_pheromone, float* d_probability, float* d_random_numbers, int* d_solutions,int* d_length)
 {
 
   int tid = threadIdx.x;
@@ -135,43 +133,43 @@ __global__ void ACO_kernel(int* d_graph, float* d_pheroneme, float* d_probabilit
       index=SERIALIZE(tid,j,GRAPH_SIZE);
   }
 
-  //Update the pheroneme based on constructed solution
-  //Each ant update its own path in the pheroneme matrix
+  //Update the pheromone based on constructed solution
+  //Each ant update its own path in the pheromone matrix
   index=SERIALIZE(tid,0,GRAPH_SIZE);
   while(d_solutions[index] != GRAPH_SIZE-1)
     {
         j=SERIALIZE(d_solutions[index],d_solutions[index+1],GRAPH_SIZE);
-        d_pheroneme[j] += UPDT_PHERONEME_CONST/d_length[tid];
+        d_pheromone[j] += UPDT_PHEROMONE_CONST/d_length[tid];
         index++;
     }
 
 }
 
-__global__ void update_pheroneme_kernel(float* d_pheroneme)
+__global__ void update_pheromone_kernel2(float* d_pheromone)
 {
   int tid = threadIdx.x;
   int index;
-  //pheroneme evaporation
+  //pheromone evaporation
   for(int j=0; j<GRAPH_SIZE; j++)
   {
     index=SERIALIZE(tid,j,GRAPH_SIZE);
-    d_pheroneme[index] = (1-EVAP_RATE) * d_pheroneme[index];
+    d_pheromone[index] = (1-EVAP_RATE) * d_pheromone[index];
   }
 }
 
 
-__global__ void update_probability_kernel1(int* d_graph, float* d_pheroneme, float* d_probability)
+__global__ void update_probability_kernel1(int* d_graph, float* d_pheromone, float* d_probability)
 {
   int tid = threadIdx.x;
   int index;
 
-  //update probability based on the new pheroneme matrix
+  //update probability based on the new pheromone matrix
   for(int j=0; j<GRAPH_SIZE; j++)
   {
       index = SERIALIZE(tid,j,GRAPH_SIZE);
       if(d_graph[index] != 0)
         {
-           d_probability[index] = pow((double)d_pheroneme[index],ALPHA) * pow( 1/(double)d_graph[index], BETA );
+           d_probability[index] = pow((double)d_pheromone[index],ALPHA) * pow( 1/(double)d_graph[index], BETA );
         }
   }
 
@@ -208,12 +206,12 @@ __global__ void sum_probablity_kernel(float* d_probability, float* d_sum)
      //first read all elements, then write
      //this is to avoid race condition ...
      //if one thread writes before another, the result will be wrong
-          tmp1 =  d_sum[fi];
-          tmp2 =  d_sum[si];
+          tmp1 = d_sum[fi];
+          tmp2 = d_sum[si];
           __syncthreads();
           d_sum[index] = d_f(tmp1, tmp2);
     
-    __syncthreads();    
+    __syncthreads();
     }
   }
 }
@@ -222,9 +220,10 @@ __global__ void sum_probablity_kernel(float* d_probability, float* d_sum)
 __global__ void update_probability_kernel2(float* d_probability,float* d_sum)
 {
   int tid = threadIdx.x;
+
   int index;
 
-  //update probability based on the new pheroneme matrix
+  //update probability based on the new pheromone matrix
   int index_sum;
   for(int j=0; j<GRAPH_SIZE; j++)
   {
@@ -235,25 +234,75 @@ __global__ void update_probability_kernel2(float* d_probability,float* d_sum)
 
 }
 
+__global__ void d_find_best_solution(int* d_solutions, int* d_length, int* d_best_solution)
+{
+  //find the shortest length and path
+  int tid = threadIdx.x;
+
+  //initialize indices
+  d_length[tid] = tid;
+
+  int fi = tid * 2;
+  int si = tid * 2 + 1;
+
+  int nsteps = log2((float)NB_ANT);
+  int tmp1,tmp2;
+
+  __shared__ int indices[GRAPH_SIZE];
+
+  #pragma unroll
+  for (int k=0; k < nsteps; k++) {
+      
+  //first read all elements, then write
+  //this is to avoid race condition ...
+  //if one thread writes before another, the result will be wrong
+        tmp1 = d_length[fi];
+        tmp2 = d_length[si];
+        __syncthreads();
+        d_length[tid] = fminf(tmp1, tmp2);
+        if(d_length[tid]==tmp1)
+        {
+          indices[tid] = fi;
+        }
+        else{
+          indices[tid] = si;
+        }
+        
+
+
+  __syncthreads();
+
+  }
+
+  //Copy the best solution (each thread copy two elements)
+  int first_index = SERIALIZE(indices[0],fi,GRAPH_SIZE);
+  int second_index = SERIALIZE(indices[0],si,GRAPH_SIZE);
+  d_best_solution[2*tid] = d_solutions[first_index];
+  d_best_solution[2*tid+1] = d_solutions[second_index];
+
+}
+
+
 /*
- * Main program and benchmarking 
- */
+* Main program and benchmarking
+*/
 int main(int argc, char** argv)
 {
 
 
-  // allocate host memory 
-  unsigned int nb_node              = GRAPH_SIZE; 
-  unsigned int size_graph           = GRAPH_SIZE*GRAPH_SIZE;
-  unsigned int mem_size_graph_int   = sizeof(int) * size_graph;
+  // allocate host memory
+  unsigned int nb_node = GRAPH_SIZE;
+  unsigned int size_graph = GRAPH_SIZE*GRAPH_SIZE;
+  unsigned int mem_size_graph_int = sizeof(int) * size_graph;
   unsigned int mem_size_graph_float = sizeof(float) * size_graph;
-  unsigned int mem_size_ant         = sizeof(int) * NB_ANT;
-  unsigned int mem_size_solution    = sizeof(int)*NB_ANT*GRAPH_SIZE;    
-  int*   h_graph                    = (int*)malloc(mem_size_graph_int); 
-  float* h_pheroneme                = (float*)malloc(mem_size_graph_float);
-  float* h_probability              = (float*)malloc(mem_size_graph_float);
-  int*   h_solutions                = (int*)malloc(mem_size_solution);
-  int*   h_length                   = (int*)malloc(mem_size_ant);
+  unsigned int mem_size_ant = sizeof(int) * NB_ANT;
+  unsigned int mem_size_solution = sizeof(int)*NB_ANT*GRAPH_SIZE;
+  int* h_graph = (int*)malloc(mem_size_graph_int);
+  float* h_pheromone = (float*)malloc(mem_size_graph_float);
+  float* h_probability = (float*)malloc(mem_size_graph_float);
+  int* h_solutions = (int*)malloc(mem_size_solution);
+  int* h_length = (int*)malloc(mem_size_ant);
+  int* h_best_solution = (int*)malloc(sizeof(int)*GRAPH_SIZE);
 
   //Initialise random numbers
   float *d_random_numbers;
@@ -263,10 +312,10 @@ int main(int argc, char** argv)
   CUDA_CALL(cudaMalloc((void **)&d_random_numbers, NB_ANT * nb_node *sizeof(float)));
 
   /* Create pseudo-random number generator */
-  CURAND_CALL(curandCreateGenerator(&gen, 
+  CURAND_CALL(curandCreateGenerator(&gen,
               CURAND_RNG_PSEUDO_DEFAULT));
   /* Set seed */
-  CURAND_CALL(curandSetPseudoRandomGeneratorSeed(gen, 
+  CURAND_CALL(curandSetPseudoRandomGeneratorSeed(gen,
               time(NULL)));
   /* Generate n floats on device */
   CURAND_CALL(curandGenerateUniform(gen, d_random_numbers, NB_ANT * nb_node ));
@@ -274,19 +323,21 @@ int main(int argc, char** argv)
 
 
   printf("Input size : %d\n", GRAPH_SIZE);
+  printf("Grid  size : %d\n", GRID_SIZE);
+  printf("Block size : %d\n", BLOCK_SIZE);
 
-  //Initialise the graph, the pheroneme and the probabilities
+  //Initialise the graph, the pheromone and the probabilities
   h_datainit_graph(h_graph, nb_node);
-  h_datainit_pheroneme(h_pheroneme, nb_node);
-  float* h_sum = h_sum_probability(h_graph, h_pheroneme, nb_node);
-  h_init_probability(h_graph, h_pheroneme, h_probability, nb_node, h_sum);
+  h_datainit_pheromone(h_pheromone, nb_node);
+  float* h_sum = h_sum_probability(h_graph, h_pheromone, nb_node);
+  h_init_probability(h_graph, h_pheromone, h_probability, nb_node, h_sum);
 
 
   // allocate device memory
   int* d_graph;
   cutilSafeCall(cudaMalloc((void**) &d_graph, mem_size_graph_int));
-  float* d_pheroneme;
-  cutilSafeCall(cudaMalloc((void**) &d_pheroneme, mem_size_graph_float));
+  float* d_pheromone;
+  cutilSafeCall(cudaMalloc((void**) &d_pheromone, mem_size_graph_float));
   float* d_probability;
   cutilSafeCall(cudaMalloc((void**) &d_probability, mem_size_graph_float));
   int* d_solutions;
@@ -298,60 +349,69 @@ int main(int argc, char** argv)
 
   //Array that contain the sum of the probability
   float* d_sum;
-  cutilSafeCall(cudaMalloc((void**) &d_sum, mem_size_graph_float));  
+  cutilSafeCall(cudaMalloc((void**) &d_sum, mem_size_graph_float));
+
+  int* d_best_solution;
+  cutilSafeCall(cudaMalloc((void**) &d_best_solution, sizeof(int)*GRAPH_SIZE));
+
   
 
   // copy host memory to device
 
   //The graph needs to be copied in the constant memory!!!!!!!!!!!!!!!
-  cutilSafeCall(cudaMemcpy(d_graph, h_graph, 
+  cutilSafeCall(cudaMemcpy(d_graph, h_graph,
               mem_size_graph_int, cudaMemcpyHostToDevice));
 
-  cutilSafeCall(cudaMemcpy(d_pheroneme, h_pheroneme, 
+  cutilSafeCall(cudaMemcpy(d_pheromone, h_pheromone,
               mem_size_graph_float, cudaMemcpyHostToDevice));
 
-  cutilSafeCall(cudaMemcpy(d_probability, h_probability, 
-              mem_size_graph_float, cudaMemcpyHostToDevice));             
+  cutilSafeCall(cudaMemcpy(d_probability, h_probability,
+              mem_size_graph_float, cudaMemcpyHostToDevice));
 
   // set up kernel for execution
   printf("Run %d Kernels.\n\n", ITER_BENCHMARK);
   unsigned int timer = 0;
   cutilCheckError(cutCreateTimer(&timer));
-  cutilCheckError(cutStartTimer(timer));  
+  cutilCheckError(cutStartTimer(timer));
 
-int* h_best_solution;
+
 // execute kernel
-  for (int j = 0; j < ITER_BENCHMARK; j++) 
+  //for (int j = 0; j < ITER_BENCHMARK; j++)
       for(int i = 0; i < ACO_ITER_MAX; i++){
 
-        init_d_solutions<<<1, NB_ANT >>>( d_solutions);
+        init_d_solutions<<<1, NB_ANT >>>(d_solutions);
         generate_solutions<<<1, NB_ANT>>>(d_probability,d_random_numbers,d_solutions);
-        ACO_kernel<<<1, NB_ANT >>>(d_graph, d_pheroneme, d_probability, d_random_numbers, d_solutions, d_length);
-        update_pheroneme_kernel<<<GRID_SIZE,BLOCK_SIZE>>>(d_pheroneme);
-        update_probability_kernel1<<<GRID_SIZE,BLOCK_SIZE>>>(d_graph, d_pheroneme, d_probability);
+        update_pheromone_kernel1<<<1, NB_ANT >>>(d_graph, d_pheromone, d_probability, d_random_numbers, d_solutions, d_length);
+
+        update_pheromone_kernel2<<<GRID_SIZE,BLOCK_SIZE>>>(d_pheromone);
+        update_probability_kernel1<<<GRID_SIZE,BLOCK_SIZE>>>(d_graph, d_pheromone, d_probability);
         sum_probablity_kernel<<<GRID_SIZE,BLOCK_SIZE/2>>>(d_probability,d_sum);
         update_probability_kernel2<<<GRID_SIZE,BLOCK_SIZE-1>>>(d_probability,d_sum);
+        d_find_best_solution<<<GRID_SIZE,BLOCK_SIZE/2>>>(d_solutions, d_length, d_best_solution);
 
-        // copy result from device to host
-        cutilSafeCall(cudaMemcpy(h_solutions, d_solutions, 
-            mem_size_solution, cudaMemcpyDeviceToHost));
+        // // copy result from device to host
+        // cutilSafeCall(cudaMemcpy(h_solutions, d_solutions,
+        // mem_size_solution, cudaMemcpyDeviceToHost));
 
-        cutilSafeCall(cudaMemcpy(h_length, d_length, 
-           mem_size_ant, cudaMemcpyDeviceToHost));
+        // cutilSafeCall(cudaMemcpy(h_length, d_length,
+        // mem_size_ant, cudaMemcpyDeviceToHost));
 
         //find the best solution and its length
-        h_best_solution = h_find_best_solution(h_solutions,h_length,NB_ANT);
+
 
 
 
         //regenerate random numbers
         /* Set seed */
-        CURAND_CALL(curandSetPseudoRandomGeneratorSeed(gen, 
+        CURAND_CALL(curandSetPseudoRandomGeneratorSeed(gen,
                     time(NULL)));
         /* Generate n floats on device */
         CURAND_CALL(curandGenerateUniform(gen, d_random_numbers, NB_ANT * nb_node ));
      }
 
+
+  cutilSafeCall(cudaMemcpy(h_best_solution, d_best_solution,
+            sizeof(int)*GRAPH_SIZE, cudaMemcpyDeviceToHost));
 
   printf("the best path is: \n");
   int i = 1;
@@ -368,21 +428,21 @@ int* h_best_solution;
   // int index;
   // for(int i=0; i<NB_ANT; i++)
   // {
-  //   for(int j=0; j<nb_node; j++)
-  //   {
-  //       index = SERIALIZE(i,j,nb_node);
-  //       printf("%d ",h_solutions[index]);
-  //   }
-  //    printf("\n");
+  // for(int j=0; j<nb_node; j++)
+  // {
+  // index = SERIALIZE(i,j,nb_node);
+  // printf("%d ",h_solutions[index]);
+  // }
+  // printf("\n");
   // }
 
   // printf("last set of length solution \n");
   // for(int i=0; i<NB_ANT; i++)
   // {
-  //   printf("%d ",h_length[i]);
+  // printf("%d ",h_length[i]);
   // }
   
-  //  printf("\n");
+  // printf("\n");
 
   // check if kernel execution generated and error
   cutilCheckMsg("Kernel execution failed");
@@ -393,38 +453,40 @@ int* h_best_solution;
   // stop and destroy timer
   cutilCheckError(cutStopTimer(timer));
   double dSeconds = cutGetTimerValue(timer)/(1000.0);
-  double dNumOps = ITER_BENCHMARK * (size_graph * 4 + NB_ANT * (2*GRAPH_SIZE + 1));
+  double dNumOps = (size_graph * 4 + NB_ANT * (2*GRAPH_SIZE + 1));
   double gflops = dNumOps/dSeconds/1.0e9;
 
   //Log througput
   printf("Throughput = %.4f GFlop/s\n", gflops);
+  printf("Times = %.4f s\n", dSeconds);
   cutilCheckError(cutDeleteTimer(timer));
 
   // clean up memory
   free(h_graph);
-  free(h_pheroneme);
+  free(h_pheromone);
   free(h_probability);
   free(h_solutions);
   free(h_length);
   free(h_sum);
   free(h_best_solution);
   cutilSafeCall(cudaFree(d_graph));
-  cutilSafeCall(cudaFree(d_pheroneme));
+  cutilSafeCall(cudaFree(d_pheromone));
   cutilSafeCall(cudaFree(d_probability));
   cutilSafeCall(cudaFree(d_solutions));
   cutilSafeCall(cudaFree(d_length));
   cutilSafeCall(cudaFree(d_sum));
+  cutilSafeCall(cudaFree(d_best_solution));
 
   CURAND_CALL(curandDestroyGenerator(gen));
-  CUDA_CALL(cudaFree(d_random_numbers)); 
+  CUDA_CALL(cudaFree(d_random_numbers));
 
   // exit and clean up device status
   cudaThreadExit();
 }
 
-// 
+//
 void h_datainit_graph(int* h_graph, int size)
-{    
+{
     //same method as the CPU version
     int i,j,index;
     for(i=0 ; i<size ; i++)
@@ -445,7 +507,7 @@ void h_datainit_graph(int* h_graph, int size)
  
 }
 
-void h_datainit_pheroneme(float* h_pheroneme, int size)
+void h_datainit_pheromone(float* h_pheromone, int size)
 {
   //same method as the CPU version
     int i,j,index;
@@ -456,10 +518,10 @@ void h_datainit_pheroneme(float* h_pheroneme, int size)
             index = SERIALIZE(i,j,size);
             if(i < j)
             {
-              h_pheroneme[index] = INIT_PHERONEME;
+              h_pheromone[index] = INIT_PHEROMONE;
             }
             else{
-            h_pheroneme[index] = 0;
+            h_pheromone[index] = 0;
           }
         }
     }
@@ -492,10 +554,10 @@ void h_datainit_graph_cube(int * h_graph,int max_depth) {
     
     // we do the rest of the rows that contain "1's"
     // Since it's a tree, we shift to the right in each row
-    //because the nodes are only connected to only 15 other nodes, 
+    //because the nodes are only connected to only 15 other nodes,
       //we skip three nodes in each row because after doing a move,
       //we don't want to do a same-face rotation again
-      // 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+      // 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
       // 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0
       // 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0
       // 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0
@@ -506,7 +568,7 @@ void h_datainit_graph_cube(int * h_graph,int max_depth) {
 
         int index = SERIALIZE(i,j,num_nodes);
 
-        if (  ( j >= 18 + (i-1) * 15 + 1) &&   j < (18 + (i-1) * 15 + 15 + 1     ) )  {
+        if ( ( j >= 18 + (i-1) * 15 + 1) && j < (18 + (i-1) * 15 + 15 + 1 ) ) {
 
           h_graph[index] = 1;
         
@@ -528,61 +590,60 @@ void h_datainit_graph_cube(int * h_graph,int max_depth) {
 
 /*
 void datainit_graph_cube(int *graph,int max_depth) {
-    
-    //calculate the number of nodes available
-    long num_nodes = max_cube_moves(max_depth);
+//calculate the number of nodes available
+long num_nodes = max_cube_moves(max_depth);
 
-    //calculate the number of nodes that are at depth max_depth -1
-    long num_nodes_at_depth_minus_one = max_cube_moves(max_depth - 1);
-    int i;
+//calculate the number of nodes that are at depth max_depth -1
+long num_nodes_at_depth_minus_one = max_cube_moves(max_depth - 1);
+int i;
 
-    for (i=0 ; i < num_nodes_at_depth_minus_one; i++) {
-      if ( i >= i * 18 + 1 && i < (i * 18 + 18) ) {
-        graph[i] = 1;
-      }
-      else {
-        graph[i] = 0;
-       }
-    }
+for (i=0 ; i < num_nodes_at_depth_minus_one; i++) {
+if ( i >= i * 18 + 1 && i < (i * 18 + 18) ) {
+graph[i] = 1;
+}
+else {
+graph[i] = 0;
+}
+}
 
-    //put zeros in the last level of nodes
-    for (i=num_nodes_at_depth_minus_one ; i < num_nodes; i++) {
-      graph[i] = 0;
-    }
-    int i,j;
-    //start from node 2, and keep track of the next node number
-    int current_node = 2;
-
-
-    //initialize the first row
-    for (i =0; i < num_nodes; i++) {
-
-          int index = SERIALIZE(i,j,18);
-            graph[index] = 0;
-            current_node++:      
-    }
+//put zeros in the last level of nodes
+for (i=num_nodes_at_depth_minus_one ; i < num_nodes; i++) {
+graph[i] = 0;
+}
+int i,j;
+//start from node 2, and keep track of the next node number
+int current_node = 2;
 
 
-    for (i =0; i < num_nodes; i++) {
+//initialize the first row
+for (i =0; i < num_nodes; i++) {
 
-        for (j=0; j<18; j++) {
+int index = SERIALIZE(i,j,18);
+graph[index] = 0;
+current_node++:
+}
 
-          int index = SERIALIZE(i,j,18);
 
-          if () { 
-            graph[index] = current_node;
-            current_node++:
-          }
-          else {
-            graph[index] = 0;
-          }
+for (i =0; i < num_nodes; i++) {
 
-        }
-    }   
+for (j=0; j<18; j++) {
+
+int index = SERIALIZE(i,j,18);
+
+if () {
+graph[index] = current_node;
+current_node++:
+}
+else {
+graph[index] = 0;
+}
+
+}
+}
 }
 */
 
-float* h_sum_probability(int* h_graph, float* h_pheroneme, int size)
+float* h_sum_probability(int* h_graph, float* h_pheromone, int size)
 
 {
     int i,j,index;
@@ -594,7 +655,7 @@ float* h_sum_probability(int* h_graph, float* h_pheroneme, int size)
         {
             index = SERIALIZE(i,j,size);
             if(h_graph[index] != 0){
-                sum[i] += pow(h_pheroneme[index],ALPHA) * pow(1/h_graph[index],BETA);
+                sum[i] += pow(h_pheromone[index],ALPHA) * pow(1/h_graph[index],BETA);
             }
         }
     }
@@ -602,7 +663,7 @@ float* h_sum_probability(int* h_graph, float* h_pheroneme, int size)
 }
 
 
-void h_init_probability(int* h_graph,float* h_pheroneme,float* h_probability, int size, float* h_sum)
+void h_init_probability(int* h_graph,float* h_pheromone,float* h_probability, int size, float* h_sum)
 {
     //same methode as the CPU version
     int i,j,index;
@@ -613,7 +674,7 @@ void h_init_probability(int* h_graph,float* h_pheroneme,float* h_probability, in
             index = SERIALIZE(i,j,size);
             if(h_graph[index] != 0)
             {
-                h_probability[index] = pow(h_pheroneme[index],ALPHA) * pow(1/h_graph[index],BETA)/h_sum[i];
+                h_probability[index] = pow(h_pheromone[index],ALPHA) * pow(1/h_graph[index],BETA)/h_sum[i];
             }
             else{
                 h_probability[index] = 0;
@@ -636,7 +697,7 @@ int* h_find_best_solution(int* h_solutions, int* h_length, int size)
         Lmin = h_length[i];
         index = SERIALIZE(i,0,GRAPH_SIZE);
         memcpy(h_best_solution, &(h_solutions[index]), sizeof(int)*GRAPH_SIZE);
-      }   
+      }
   }
   return h_best_solution;
 }

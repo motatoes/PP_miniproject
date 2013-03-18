@@ -15,23 +15,21 @@
 
 /*ACO parameters*/
   //Number of nodes in the graph
-  #define GRAPH_SIZE 1024
+  #define GRAPH_SIZE 64
   //Number of iteration in ACO algorithm
   #define ACO_ITER_MAX 2
   //evaporation rate
   #define EVAP_RATE 0.3
-  //influence rate of the pheroneme
+  //influence rate of the pheromone
   #define ALPHA 0.8
   //influence rate of the heuristic (distance)
   #define BETA 0.2
-  //Initial level of pheroneme
-  #define INIT_PHERONEME 5
-  //Update pheroneme constant
-  #define UPDT_PHERONEME_CONST 2
-  //Number of moves allowed through the graph
-  #define NSTEPS 2
+  //Initial level of pheromone
+  #define INIT_PHEROMONE 5
+  //Update pheromone constant
+  #define UPDT_PHEROMONE_CONST 2
   //Number of ants
-  #define NB_ANT 1024
+  #define NB_ANT 256
 /*End ACO parameters*/
 
 /*GPU parameters*/
@@ -52,10 +50,10 @@
 
 //function prototypes
 void h_datainit_graph(int*, int);
-void h_datainit_pheroneme(float*, int);
-void h_update_pheroneme(float* h_pheroneme, int size);
-float* h_sum_probability(int* h_graph, float* h_pheroneme, int size);
-void h_update_probability(int* h_graph,float* h_pheroneme,float* h_probability, int size, float* h_sum);
+void h_datainit_pheromone(float*, int);
+void h_update_pheromone(float* h_pheromone, int size);
+float* h_sum_probability(int* h_graph, float* h_pheromone, int size);
+void h_update_probability(int* h_graph,float* h_pheromone,float* h_probability, int size, float* h_sum);
 int* h_find_best_solution(int* h_solutions, int* h_length, int size);
 ;
 //a macro function that takes as parameters the indexes
@@ -64,7 +62,7 @@ int* h_find_best_solution(int* h_solutions, int* h_length, int size);
 #define SERIALIZE(i,j,row_size) i * row_size + j;
 
 
-__global__ void ACO_kernel(int* d_graph, float* d_pheroneme, float* d_probability, float* d_random_numbers, int* d_solutions,int* d_length)
+__global__ void ACO_kernel(int* d_graph, float* d_pheromone, float* d_probability, float* d_random_numbers, int* d_solutions,int* d_length)
 {
   int tid = threadIdx.x;
 
@@ -125,13 +123,13 @@ __global__ void ACO_kernel(int* d_graph, float* d_pheroneme, float* d_probabilit
       index=SERIALIZE(tid,j,GRAPH_SIZE);
   }
 
-  //Update the pheroneme based on constructed solution
-  //Each ant update its own path in the pheroneme matrix
+  //Update the pheromone based on constructed solution
+  //Each ant update its own path in the pheromone matrix
   index=SERIALIZE(tid,0,GRAPH_SIZE);
   while(d_solutions[index] != GRAPH_SIZE-1)
     {
         j=SERIALIZE(d_solutions[index],d_solutions[index+1],GRAPH_SIZE);
-        d_pheroneme[j] += UPDT_PHERONEME_CONST/d_length[tid];
+        d_pheromone[j] += UPDT_PHEROMONE_CONST/d_length[tid];
         index++;
     }
 
@@ -153,7 +151,7 @@ int main(int argc, char** argv)
   unsigned int mem_size_ant         = sizeof(int) * NB_ANT;
   unsigned int mem_size_solution    = sizeof(int)*NB_ANT*GRAPH_SIZE;    
   int*   h_graph                    = (int*)malloc(mem_size_graph_int); 
-  float* h_pheroneme                = (float*)malloc(mem_size_graph_float);
+  float* h_pheromone                = (float*)malloc(mem_size_graph_float);
   float* h_probability              = (float*)malloc(mem_size_graph_float);
   int*   h_solutions                = (int*)malloc(mem_size_solution);
   int*   h_length                   = (int*)malloc(mem_size_ant);
@@ -176,19 +174,19 @@ int main(int argc, char** argv)
 
   printf("Input size : %d\n", GRAPH_SIZE);
 
-  //Initialise the graph, the pheroneme and the probabilities
+  //Initialise the graph, the pheromone and the probabilities
   h_datainit_graph(h_graph, nb_node);
-  h_datainit_pheroneme(h_pheroneme, nb_node);
-  float* h_sum = h_sum_probability(h_graph, h_pheroneme, nb_node);
-  h_update_probability(h_graph, h_pheroneme, h_probability, nb_node, h_sum);
+  h_datainit_pheromone(h_pheromone, nb_node);
+  float* h_sum = h_sum_probability(h_graph, h_pheromone, nb_node);
+  h_update_probability(h_graph, h_pheromone, h_probability, nb_node, h_sum);
 
 
 
   // allocate device memory
   int* d_graph;
   cutilSafeCall(cudaMalloc((void**) &d_graph, mem_size_graph_int));
-  float* d_pheroneme;
-  cutilSafeCall(cudaMalloc((void**) &d_pheroneme, mem_size_graph_float));
+  float* d_pheromone;
+  cutilSafeCall(cudaMalloc((void**) &d_pheromone, mem_size_graph_float));
   float* d_probability;
   cutilSafeCall(cudaMalloc((void**) &d_probability, mem_size_graph_float));
   int* d_solutions;
@@ -205,7 +203,7 @@ int main(int argc, char** argv)
   cutilSafeCall(cudaMemcpy(d_graph, h_graph, 
               mem_size_graph_int, cudaMemcpyHostToDevice));
 
-  cutilSafeCall(cudaMemcpy(d_pheroneme, h_pheroneme, 
+  cutilSafeCall(cudaMemcpy(d_pheromone, h_pheromone, 
               mem_size_graph_float, cudaMemcpyHostToDevice));
 
   cutilSafeCall(cudaMemcpy(d_probability, h_probability, 
@@ -219,32 +217,32 @@ int main(int argc, char** argv)
 
 int* h_best_solution;
 // execute kernel
-  for (int j = 0; j < ITER_BENCHMARK; j++) 
+  //for (int j = 0; j < ITER_BENCHMARK; j++) 
       for(int i = 0; i < ACO_ITER_MAX; i++){
 
-          ACO_kernel<<<1, NB_ANT >>>(d_graph, d_pheroneme, d_probability, d_random_numbers, d_solutions, d_length);
+          ACO_kernel<<<1, NB_ANT >>>(d_graph, d_pheromone, d_probability, d_random_numbers, d_solutions, d_length);
           // copy result from device to host
           cutilSafeCall(cudaMemcpy(h_solutions, d_solutions, 
                mem_size_solution, cudaMemcpyDeviceToHost));
           cutilSafeCall(cudaMemcpy(h_length, d_length, 
                mem_size_ant, cudaMemcpyDeviceToHost));
-          cutilSafeCall(cudaMemcpy(h_pheroneme, d_pheroneme, 
+          cutilSafeCall(cudaMemcpy(h_pheromone, d_pheromone, 
                mem_size_graph_float, cudaMemcpyDeviceToHost));
           //find the best solution and its length
           h_best_solution = h_find_best_solution(h_solutions,h_length,NB_ANT);
-          //update the pheroneme (evaporation)
-          h_update_pheroneme(h_pheroneme,nb_node);
+          //update the pheromone (evaporation)
+          h_update_pheromone(h_pheromone,nb_node);
           //update the probability
-          h_sum = h_sum_probability(h_graph, h_pheroneme, nb_node);
-          h_update_probability(h_graph, h_pheroneme, h_probability, nb_node, h_sum);
-          //copy back the update pheroneme and probability to the GPU
-          cutilSafeCall(cudaMemcpy(d_pheroneme, h_pheroneme, 
+          h_sum = h_sum_probability(h_graph, h_pheromone, nb_node);
+          h_update_probability(h_graph, h_pheromone, h_probability, nb_node, h_sum);
+          //copy back the update pheromone and probability to the GPU
+          cutilSafeCall(cudaMemcpy(d_pheromone, h_pheromone, 
               mem_size_graph_float, cudaMemcpyHostToDevice));
 
           cutilSafeCall(cudaMemcpy(d_probability, h_probability, 
               mem_size_graph_float, cudaMemcpyHostToDevice));
 
-                  //regenerate random numbers
+        //regenerate random numbers
         /* Set seed */
         CURAND_CALL(curandSetPseudoRandomGeneratorSeed(gen, 
                     time(NULL)));
@@ -289,7 +287,7 @@ int* h_best_solution;
   // stop and destroy timer
   cutilCheckError(cutStopTimer(timer));
   double dSeconds = cutGetTimerValue(timer)/(1000.0);
-  double dNumOps = ITER_BENCHMARK * (size_graph * 3 + NB_ANT * GRAPH_SIZE + NB_ANT);
+  double dNumOps = (size_graph * 3 + NB_ANT * GRAPH_SIZE + NB_ANT);
   double gflops = dNumOps/dSeconds/1.0e9;
 
   //Log througput
@@ -299,14 +297,14 @@ int* h_best_solution;
 
   // clean up memory
   free(h_graph);
-  free(h_pheroneme);
+  free(h_pheromone);
   free(h_probability);
   free(h_solutions);
   free(h_length);
   free(h_sum);
   free(h_best_solution);
   cutilSafeCall(cudaFree(d_graph));
-  cutilSafeCall(cudaFree(d_pheroneme));
+  cutilSafeCall(cudaFree(d_pheromone));
   cutilSafeCall(cudaFree(d_probability));
   cutilSafeCall(cudaFree(d_solutions));
   cutilSafeCall(cudaFree(d_length));
@@ -341,7 +339,7 @@ void h_datainit_graph(int* h_graph, int size)
  
 }
 
-void h_datainit_pheroneme(float* h_pheroneme, int size)
+void h_datainit_pheromone(float* h_pheromone, int size)
 {
   //same method as the CPU version
     int i,j,index;
@@ -351,9 +349,9 @@ void h_datainit_pheroneme(float* h_pheroneme, int size)
         {
             index = SERIALIZE(i,j,size);
             if(i < j)
-                h_pheroneme[index] = INIT_PHERONEME;
+                h_pheromone[index] = INIT_PHEROMONE;
             else{
-            h_pheroneme[index] = 0;}
+            h_pheromone[index] = 0;}
         }
     }
 
@@ -477,7 +475,7 @@ void datainit_graph_cube(int *graph,int max_depth) {
 
 
 
-void h_update_pheroneme(float* h_pheroneme, int size)
+void h_update_pheromone(float* h_pheromone, int size)
 {
     int i,j,index;
     //evaporation
@@ -486,16 +484,16 @@ void h_update_pheroneme(float* h_pheroneme, int size)
         for(j=0 ; j<size ; j++)
         {
           index = SERIALIZE(i,j,size);
-            if(h_pheroneme !=0)
+            if(h_pheromone !=0)
             {
-              h_pheroneme[index] = (1-EVAP_RATE) * h_pheroneme[index];
+              h_pheromone[index] = (1-EVAP_RATE) * h_pheromone[index];
             }
         }
     }
 }
 
 
-float* h_sum_probability(int* h_graph, float* h_pheroneme, int size)
+float* h_sum_probability(int* h_graph, float* h_pheromone, int size)
 
 {
     int i,j,index;
@@ -507,7 +505,7 @@ float* h_sum_probability(int* h_graph, float* h_pheroneme, int size)
         {
             index = SERIALIZE(i,j,size);
             if(h_graph[index] != 0){
-                sum[i] += pow(h_pheroneme[index],ALPHA) * pow(1/h_graph[index],BETA);
+                sum[i] += pow(h_pheromone[index],ALPHA) * pow(1/h_graph[index],BETA);
             }
         }
     }
@@ -515,7 +513,7 @@ float* h_sum_probability(int* h_graph, float* h_pheroneme, int size)
 }
 
 
-void h_update_probability(int* h_graph,float* h_pheroneme,float* h_probability, int size, float* h_sum)
+void h_update_probability(int* h_graph,float* h_pheromone,float* h_probability, int size, float* h_sum)
 {
     //same methode as the CPU version
     int i,j,index;
@@ -526,7 +524,7 @@ void h_update_probability(int* h_graph,float* h_pheroneme,float* h_probability, 
             index = SERIALIZE(i,j,size);
             if(h_graph[index] != 0)
             {
-                h_probability[index] = pow(h_pheroneme[index],ALPHA) * pow(1/h_graph[index],BETA)/h_sum[i];
+                h_probability[index] = pow(h_pheromone[index],ALPHA) * pow(1/h_graph[index],BETA)/h_sum[i];
             }
             else{
                 h_probability[index] = 0;

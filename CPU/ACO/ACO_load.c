@@ -11,7 +11,7 @@
 #include "constant.h"
 #include "util.c"
 #include "fileio.c"
-#include "pheroneme.c"
+#include "pheromone.c"
 #include "probability.c"
 #include "graph.c"
 
@@ -26,9 +26,9 @@ int main(int argc, char **argv)
     //We load it from the file graph.txt
     int * G = load_int("data/graph1.txt",&n);
 
-    //We define the level of pheroneme for each edge in a matrix
-    //We load it from the file pheroneme.txt
-    float * T = load_float("data/pheroneme1.txt",&n);
+    //We define the level of pheromone for each edge in a matrix
+    //We load it from the file pheromone.txt
+    float * T = load_float("data/pheromone1.txt",&n);
 
     //We define the matrice of the probabilities
     float * P = malloc(sizeof(float)*n*n);
@@ -39,7 +39,7 @@ int main(int argc, char **argv)
 
     printf("graph: \n");
     print_int(G,n);
-    printf("pheroneme: \n");
+    printf("pheromone: \n");
     print_float(T,n);
     printf("probabilities: \n");
     print_float(P,n);
@@ -127,15 +127,15 @@ int main(int argc, char **argv)
                 memcpy(best_path, kth_solution, sizeof(int)*n );
             }
 
-            //update pheroneme values based on the solution
-            update_pheroneme1(T,n,kth_solution,L[k]);
+            //update pheromone values based on the solution
+            update_pheromone1(T,n,kth_solution,L[k]);
 
             free(kth_solution);
 
         }
 
-        //evaporation of the pheroneme
-        update_pheroneme2(T,n);
+        //evaporation of the pheromone
+        update_pheromone2(T,n);
 
         //update probabilities
         sum = sum_prob(G,T,n);
@@ -144,7 +144,7 @@ int main(int argc, char **argv)
         //increment iter
         iter++;
 
-        printf("pheroneme: \n");
+        printf("pheromone: \n");
         print_float(T,n);
         printf("probabilities: \n");
         print_float(P,n);

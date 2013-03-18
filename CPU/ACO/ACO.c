@@ -9,7 +9,7 @@
 //libs
 #include "constant.h"
 #include "util.c"
-#include "pheroneme.c"
+#include "pheromone.c"
 #include "probability.c"
 #include "graph.c"
 
@@ -24,15 +24,15 @@ int main(int argc, char **argv)
     //if two nodes are not connected then the value is 0
     int * G = malloc(sizeof(int)*N);
 
-    //We define the level of pheroneme for each edge in a matrix
+    //We define the level of pheromone for each edge in a matrix
     float * T = malloc(sizeof(float)*N);
 
     //We define the matrice of the probabilities
     float * P = malloc(sizeof(float)*N);
 
-    //Initialize the graph and the level of pheroneme
+    //Initialize the graph and the level of pheromone
     init_graph(G,GRAPH_SIZE);
-    init_pheroneme(T,GRAPH_SIZE);
+    init_pheromone(T,GRAPH_SIZE);
 
     //Initialize the probabilities
     float * sum = sum_prob(G,T,GRAPH_SIZE);
@@ -40,7 +40,7 @@ int main(int argc, char **argv)
 
     printf("graph: \n");
     print_int(G,GRAPH_SIZE);
-    printf("pheroneme: \n");
+    printf("pheromone: \n");
     print_float(T,GRAPH_SIZE);
     printf("probabilities: \n");
     print_float(P,GRAPH_SIZE);
@@ -128,15 +128,15 @@ int main(int argc, char **argv)
                 memcpy(best_path, kth_solution, sizeof(int)*GRAPH_SIZE );
             }
 
-            //update pheroneme values based on the solution
-            update_pheroneme1(T,GRAPH_SIZE,kth_solution,L[k]);
+            //update pheromone values based on the solution
+            update_pheromone1(T,GRAPH_SIZE,kth_solution,L[k]);
 
             free(kth_solution);
 
         }
 
-        //evaporation of the pheroneme
-        update_pheroneme2(T,GRAPH_SIZE);
+        //evaporation of the pheromone
+        update_pheromone2(T,GRAPH_SIZE);
 
         //update probabilities
         sum = sum_prob(G,T,GRAPH_SIZE);
@@ -145,7 +145,7 @@ int main(int argc, char **argv)
         //increment iter
         iter++;
 
-        printf("pheroneme: \n");
+        printf("pheromone: \n");
         print_float(T,GRAPH_SIZE);
         printf("probabilities: \n");
         print_float(P,GRAPH_SIZE);

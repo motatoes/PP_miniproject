@@ -10,9 +10,9 @@
 //influence rate of the heuristic (distance)
 #define BETA 0.2
 //Initial level of pheroneme
-#define INIT_PHERONEME 5
+#define INIT_PHEROMONE 5
 //Update pheroneme constant
-#define UPDT_PHERONEME_CONST 2
+#define UPDT_PHEROMONE_CONST 2
 //Number of ants
 #define NB_ANT 2
 
